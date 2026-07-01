@@ -1,0 +1,212 @@
+rules_version = '2';
+
+// ===============================================================
+// iCare Quiz Arena — Firestore Security Rules
+// ===============================================================
+//
+// STATUS: hardened prototype. These rules enforce tenant isolation,
+// host-only game control, anti-cheat on answers, and field-level
+// immutability. Review before a large public launch.
+//
+// KNOWN LIMITATION: Firestore rules cannot iterate arrays, so the CONTENTS
+// of the `questions` array on a quiz are not deep-validated here. This is an
+// accepted risk because a quiz is writable ONLY by its owner — a malformed
+// question can only corrupt the owner's own quiz, never another tenant's data
+// and never anything a player can read. The client validates question shape.
+//
+// ---------------------------------------------------------------
+// Assumed Data Model
+// ---------------------------------------------------------------
+// quizzes/{quizId}  (OWNER-READ-ONLY — embeds correct answers)
+//   ownerUid:string(immutable) title:string(1..200) description:string|null(<=1000)
+//   logoUrl:string|null gamePin:string|null isPublished:bool
+//   questionCount:number(==questions.size()) questions:list(<=100)
+//   createdAt:timestamp(immutable) updatedAt:timestamp
+//
+// sessions/{sessionId}  (no PII; readable by any signed-in user)
+//   quizId:string(immutable) hostUid:string(immutable) quizTitle:string
+//   quizLogoUrl:string|null gamePin:string(immutable) status:WAITING|LIVE|ENDED
+//   currentQuestionIndex:number questionStatus:CLOSED|OPEN|REVEAL
+//   questionStartedAt:timestamp|null currentQuestion:map|null (player-safe)
+//   revealedAnswers:list|null totalQuestions:number participantCount:number
+//   isRoomLocked:bool createdAt:timestamp(immutable) updatedAt:timestamp
+//
+//   participants/{uid}  (uid == doc id == auth uid)
+//     uid,nickname(1..20),role='PLAYER',joinedAt  -> immutable after create
+//     totalPoints:number, streak:number, isKicked:bool -> host-mutable only
+//
+//   answers/{questionId_uid}
+//     uid,questionId,answerPayload(list<=10),answerTimeMs,submittedAt -> immutable
+//     isCorrect:bool|null, pointsAwarded:number -> host-mutable only (grading)
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- Helper functions ----------
+    function isAuthed() {
+      return request.auth != null;
+    }
+    // A "host" is a real (non-anonymous) account that can author & run quizzes.
+    function isHostAccount() {
+      return isAuthed() && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+    function isOwner(uid) {
+      return isAuthed() && request.auth.uid == uid;
+    }
+    function sessionData(sessionId) {
+      return get(/databases/$(database)/documents/sessions/$(sessionId)).data;
+    }
+    function isSessionHost(sessionId) {
+      return isAuthed() && sessionData(sessionId).hostUid == request.auth.uid;
+    }
+    function sessionExists(sessionId) {
+      return exists(/databases/$(database)/documents/sessions/$(sessionId));
+    }
+    function validStr(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+        request.resource.data[field].size() >= minLen &&
+        request.resource.data[field].size() <= maxLen;
+    }
+    function onlyFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+    // No listed field may change between the existing and incoming document.
+    function notChanging(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // ---------- Quizzes (owner-only; contain correct answers) ----------
+    function isValidQuiz() {
+      return onlyFields(['ownerUid','title','description','logoUrl','gamePin',
+                         'isPublished','questionCount','questions','createdAt','updatedAt']) &&
+        request.resource.data.ownerUid == request.auth.uid &&
+        validStr('title', 1, 200) &&
+        (request.resource.data.description == null || request.resource.data.description.size() <= 1000) &&
+        (request.resource.data.logoUrl == null || request.resource.data.logoUrl is string) &&
+        request.resource.data.isPublished is bool &&
+        request.resource.data.questionCount is number &&
+        request.resource.data.questions is list &&
+        request.resource.data.questions.size() <= 100 &&
+        request.resource.data.questionCount == request.resource.data.questions.size();
+    }
+
+    match /quizzes/{quizId} {
+      // Owner-read-only: questions embed the correct answers.
+      allow read: if isOwner(resource.data.ownerUid);
+      allow create: if isHostAccount() && isValidQuiz() &&
+                       request.resource.data.questionCount >= 0;
+      allow update: if isOwner(resource.data.ownerUid) && isValidQuiz() &&
+                       notChanging(['ownerUid','createdAt']);
+      allow delete: if isOwner(resource.data.ownerUid);
+    }
+
+    // ---------- Public template library ----------
+    // Templates are shared, reusable quizzes. They are intentionally
+    // world-readable (the whole point is to browse & clone them), so they must
+    // NOT contain anything private. Only a host may publish, and only the
+    // owner may edit/remove their own template.
+    match /templates/{templateId} {
+      allow read: if true;
+      allow create: if isHostAccount() &&
+        request.resource.data.ownerUid == request.auth.uid &&
+        validStr('title', 1, 200) &&
+        (request.resource.data.description == null || request.resource.data.description.size() <= 1000) &&
+        request.resource.data.category is string &&
+        request.resource.data.questions is list &&
+        request.resource.data.questions.size() <= 100;
+      allow update, delete: if isOwner(resource.data.ownerUid);
+    }
+
+    // ---------- Sessions ----------
+    function isValidSessionCreate() {
+      return request.resource.data.hostUid == request.auth.uid &&
+        request.resource.data.quizId is string &&
+        validStr('quizTitle', 1, 200) &&
+        validStr('gamePin', 4, 8) &&
+        request.resource.data.status in ['WAITING','LIVE','ENDED'] &&
+        request.resource.data.isRoomLocked is bool &&
+        request.resource.data.currentQuestionIndex is number &&
+        request.resource.data.questionStatus in ['CLOSED','OPEN','REVEAL'];
+    }
+
+    match /sessions/{sessionId} {
+      // Non-sensitive game state — any signed-in user (incl. players) may read.
+      allow read: if isAuthed();
+      allow create: if isHostAccount() && isValidSessionCreate();
+      // Only the host drives the game; identity/pin/creation are immutable.
+      allow update: if isOwner(resource.data.hostUid) &&
+                       request.resource.data.status in ['WAITING','LIVE','ENDED'] &&
+                       request.resource.data.questionStatus in ['CLOSED','OPEN','REVEAL'] &&
+                       notChanging(['hostUid','quizId','gamePin','createdAt']);
+      allow delete: if isOwner(resource.data.hostUid);
+
+      // ---------- Participants ----------
+      function validParticipantCreate() {
+        return onlyFields(['uid','nickname','role','totalPoints','streak','isKicked',
+                           'teamId','teamName','teamColor','joinedAt']) &&
+          request.resource.data.uid == request.auth.uid &&
+          validStr('nickname', 1, 20) &&
+          request.resource.data.role == 'PLAYER' &&
+          request.resource.data.totalPoints == 0 &&
+          request.resource.data.streak == 0 &&
+          request.resource.data.isKicked == false &&
+          (request.resource.data.teamId == null || request.resource.data.teamId is string) &&
+          sessionExists(sessionId) &&
+          sessionData(sessionId).status != 'ENDED' &&
+          sessionData(sessionId).isRoomLocked == false;
+      }
+
+      match /participants/{participantId} {
+        allow read: if isAuthed();
+        // A player creates their own participant doc (doc id == their uid).
+        allow create: if isOwner(participantId) && validParticipantCreate();
+        // Host mutates score/streak/kick and team assignment; identity frozen.
+        allow update: if isSessionHost(sessionId) &&
+          onlyFields(['uid','nickname','role','totalPoints','streak','isKicked',
+                      'teamId','teamName','teamColor','joinedAt']) &&
+          notChanging(['uid','nickname','role','joinedAt']) &&
+          request.resource.data.totalPoints is number &&
+          request.resource.data.streak is number &&
+          request.resource.data.isKicked is bool;
+        allow delete: if isSessionHost(sessionId);
+      }
+
+      // ---------- Answers (doc id is `${questionId}_${uid}`) ----------
+      function playerIsActive() {
+        return exists(/databases/$(database)/documents/sessions/$(sessionId)/participants/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/sessions/$(sessionId)/participants/$(request.auth.uid)).data.isKicked == false;
+      }
+
+      match /answers/{answerId} {
+        // Host sees all answers; a player may read only their own.
+        allow read: if isSessionHost(sessionId) ||
+                       (isAuthed() && resource.data.uid == request.auth.uid);
+        // A player records exactly one answer per question, only while OPEN,
+        // only for the live question, only if they are an active participant,
+        // and cannot self-grade (isCorrect/pointsAwarded fixed at null/0).
+        allow create: if isOwner(request.resource.data.uid) &&
+          onlyFields(['uid','questionId','answerPayload','answerTimeMs','isCorrect','pointsAwarded','submittedAt']) &&
+          answerId == request.resource.data.questionId + '_' + request.auth.uid &&
+          request.resource.data.questionId is string &&
+          request.resource.data.answerPayload is list &&
+          request.resource.data.answerPayload.size() <= 10 &&
+          request.resource.data.answerTimeMs is number &&
+          request.resource.data.answerTimeMs >= 0 &&
+          request.resource.data.isCorrect == null &&
+          request.resource.data.pointsAwarded == 0 &&
+          sessionExists(sessionId) &&
+          sessionData(sessionId).questionStatus == 'OPEN' &&
+          sessionData(sessionId).currentQuestion.questionId == request.resource.data.questionId &&
+          playerIsActive();
+        // Grading is host-only and may touch only the score fields.
+        allow update: if isSessionHost(sessionId) &&
+          onlyFields(['uid','questionId','answerPayload','answerTimeMs','isCorrect','pointsAwarded','submittedAt']) &&
+          notChanging(['uid','questionId','answerPayload','answerTimeMs','submittedAt']) &&
+          (request.resource.data.isCorrect == null || request.resource.data.isCorrect is bool) &&
+          request.resource.data.pointsAwarded is number;
+        allow delete: if isSessionHost(sessionId);
+      }
+    }
+  }
+}
