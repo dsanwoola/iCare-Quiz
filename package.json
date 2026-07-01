@@ -6,6 +6,7 @@
   "dependencies": {
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "express": "^4.22.2",
     "firebase": "^11.10.0",
     "lucide-react": "^0.510.0",
     "mammoth": "^1.11.0",
@@ -38,6 +39,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "start": "node server.js",
     "lint": "eslint .",
     "preview": "vite preview",
     "deploy": "npm run build && firebase deploy"
