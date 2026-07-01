@@ -1,0 +1,14 @@
+# Firebase App Hosting configuration.
+# Docs: https://firebase.google.com/docs/app-hosting/configure
+#
+# This app is a static Vite SPA; all Firebase web-config values have safe
+# public defaults baked into src/react-app/lib/firebase.ts, so no build-time
+# secrets are required here. Add `env:` entries with `secret:` only if that
+# changes in the future.
+
+runConfig:
+  cpu: 1
+  memoryMiB: 512
+  minInstances: 0
+  maxInstances: 2
+  concurrency: 80
