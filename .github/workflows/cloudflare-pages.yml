@@ -1,0 +1,32 @@
+name: Deploy to Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm run build
+      - name: Add Cloudflare SPA routing/headers
+        run: |
+          cat > dist/_headers <<'EOF'
+          /assets/*
+            Cache-Control: public, max-age=31536000, immutable
+          EOF
+          cat > dist/_redirects <<'EOF'
+          /* /index.html 200
+          EOF
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name icare-quiz-arena --branch main
