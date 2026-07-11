@@ -15,6 +15,7 @@ import {
   Play,
   QrCode,
   Share2,
+  Smartphone,
 } from "lucide-react";
 import { useAuth } from "@/react-app/hooks/useAuth";
 import AuthDialog from "@/react-app/components/AuthDialog";
@@ -25,13 +26,13 @@ const features = [
   { icon: Users2, title: "Team mode", desc: "Split players into colour-coded teams and battle for the top." },
   { icon: Trophy, title: "Live leaderboards", desc: "Speed and streak scoring that updates in real time." },
   { icon: BarChart3, title: "Quiz analytics", desc: "See accuracy, your hardest questions and response times." },
-  { icon: LayoutTemplate, title: "Template library", desc: "Start from ready-made quizzes or publish your own." },
+  { icon: Smartphone, title: "No app, just a phone", desc: "Players join in their mobile browser with a PIN or QR — nothing to download or install." },
 ];
 
 const steps = [
   { icon: Wand2, title: "Build or generate", desc: "Create a quiz yourself, or let AI write one from a topic." },
-  { icon: QrCode, title: "Share the PIN", desc: "Players join instantly with a 6-digit PIN or QR code." },
-  { icon: Play, title: "Play live", desc: "Run the game and watch the leaderboard climb." },
+  { icon: QrCode, title: "Everyone grabs a phone", desc: "Players scan the QR or type the PIN in their phone's browser — no app to install." },
+  { icon: Play, title: "Battle it out", desc: "Questions hit the big screen; each player taps their answer on their own phone. Fastest correct climbs the board." },
 ];
 
 export default function HomePage() {
@@ -101,18 +102,18 @@ export default function HomePage() {
 
         <div className="max-w-3xl mx-auto text-center px-4 pt-14 sm:pt-20 pb-14">
           <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 text-primary px-4 py-1.5 text-xs sm:text-sm font-semibold mb-6">
-            <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            Real-time multiplayer quizzes
+            <Smartphone className="w-3.5 h-3.5" />
+            No app needed — your phone is the buzzer
           </span>
 
           <h1 className="text-4xl sm:text-6xl md:text-7xl font-black tracking-tight leading-[1.05]">
-            Play <span className="text-gradient">quiz battles</span>
+            Grab your <span className="text-gradient">phone</span>.
             <br />
-            with your <span className="text-yellow-500">neighbours</span>
+            Battle the <span className="text-yellow-500">neighbours</span>.
           </h1>
 
           <p className="mt-5 text-base sm:text-xl text-muted-foreground max-w-xl mx-auto">
-            Host a live quiz or jump into a game with a PIN. AI-built quizzes, team play, and instant leaderboards.
+            Questions go up on the big screen — everyone answers live from their own phone. No downloads, no fuss: just tap in the game PIN and play.
           </p>
 
           {/* CTA band */}
@@ -122,7 +123,7 @@ export default function HomePage() {
               <Trophy className="w-10 h-10 mx-auto mb-3 text-yellow-300" />
               <h2 className="text-2xl sm:text-3xl font-black mb-2">Ready to play?</h2>
               <p className="text-white/80 max-w-md mx-auto mb-6">
-                Spin up a quiz in minutes, or drop a PIN to join the neighbours already playing.
+                Everyone grabs their phone, taps in the PIN, and races up the leaderboard — no installs, no fuss.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                 {isHost ? (
@@ -191,8 +192,8 @@ export default function HomePage() {
       {/* Features */}
       <section className="max-w-6xl mx-auto px-4 py-12 sm:py-16 w-full">
         <div className="text-center mb-10">
-          <h2 className="text-2xl sm:text-4xl font-bold">Everything you need to run a great quiz</h2>
-          <p className="text-muted-foreground mt-2">Built for classrooms, team socials, events and game nights.</p>
+          <h2 className="text-2xl sm:text-4xl font-bold">Everyone plays from their own phone</h2>
+          <p className="text-muted-foreground mt-2">Built for classrooms, team socials, events and game nights — no shared devices, no installs.</p>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
           {features.map((f) => {
