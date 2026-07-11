@@ -924,7 +924,7 @@ export async function seedStarterTemplates(): Promise<number> {
       category: t.category,
       questionCount: t.questions.length,
       questions: t.questions,
-      authorName: "iCare Quiz",
+      authorName: "Neighbours Quiz",
       createdAt: serverTimestamp(),
     });
     count++;

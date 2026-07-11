@@ -1,4 +1,4 @@
-# iCare Quiz Arena
+# Neighbours Quiz Arena
 
 Real-time, Kahoot-style quiz battles. Hosts create quizzes (or generate them with
 AI) and run live games; players join with a 6-digit PIN or QR code and compete on a

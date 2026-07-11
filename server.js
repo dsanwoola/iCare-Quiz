@@ -32,5 +32,5 @@ app.get("*", (_req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`iCare Quiz Arena listening on port ${port}`);
+  console.log(`Neighbours Quiz Arena listening on port ${port}`);
 });

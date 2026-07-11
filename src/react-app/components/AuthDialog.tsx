@@ -170,7 +170,7 @@ export default function AuthDialog({ open, onOpenChange, onSuccess }: AuthDialog
           </form>
 
           <p className="text-center text-sm text-muted-foreground">
-            {mode === "signin" ? "New to iCare Quiz Arena?" : "Already have an account?"}{" "}
+            {mode === "signin" ? "New to Neighbours Quiz Arena?" : "Already have an account?"}{" "}
             <button
               type="button"
               onClick={() => {

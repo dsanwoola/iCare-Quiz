@@ -76,7 +76,7 @@ export default function QuizShareModal({
   const getJoinUrl = () => `${window.location.origin}/join/${gamePin}`;
 
   const getShareMessage = () => {
-    return `🎮 Join my quiz "${quizTitle}" on iCare Quiz Arena!\n\n📍 Click to join: ${getJoinUrl()}\n\nSee you there! 🎉`;
+    return `🎮 Join my quiz "${quizTitle}" on Neighbours Quiz Arena!\n\n📍 Click to join: ${getJoinUrl()}\n\nSee you there! 🎉`;
   };
 
   const copyPin = async () => {
@@ -110,7 +110,7 @@ export default function QuizShareModal({
           window.open(`sms:?body=${message}`, "_blank");
           break;
         case "telegram": {
-          const text = encodeURIComponent(`🎮 Join my quiz "${quizTitle}" on iCare Quiz Arena!`);
+          const text = encodeURIComponent(`🎮 Join my quiz "${quizTitle}" on Neighbours Quiz Arena!`);
           window.open(`https://t.me/share/url?url=${encodeURIComponent(getJoinUrl())}&text=${text}`, "_blank");
           break;
         }

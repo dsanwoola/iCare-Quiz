@@ -47,7 +47,7 @@ export default function HomePage() {
             <Zap className="w-6 h-6 sm:w-10 sm:h-10 text-white" />
           </div>
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-black tracking-tight">
-            <span className="text-gradient">iCare Quiz</span>
+            <span className="text-gradient">Neighbours Quiz</span>
             <span className="text-blue-900"> Arena</span>
           </h1>
         </div>
@@ -126,7 +126,7 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="py-4 sm:py-6 text-center text-xs sm:text-sm text-muted-foreground border-t">
-        <p>iCare Quiz Arena — Real-time quiz battles</p>
+        <p>Neighbours Quiz Arena — Real-time quiz battles</p>
       </footer>
     </div>
   );

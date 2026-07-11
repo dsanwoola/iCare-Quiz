@@ -125,7 +125,7 @@ export default function PlayerWaitingRoom() {
           <div className="gradient-secondary p-2 sm:p-3 rounded-xl sm:rounded-2xl shadow-lg shadow-secondary/30">
             <Zap className="w-5 h-5 sm:w-7 sm:h-7 text-white" />
           </div>
-          <span className="text-xl sm:text-2xl font-bold">iCare Quiz Arena</span>
+          <span className="text-xl sm:text-2xl font-bold">Neighbours Quiz Arena</span>
         </div>
 
         {/* Player badge */}

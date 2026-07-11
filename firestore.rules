@@ -1,7 +1,7 @@
 rules_version = '2';
 
 // ===============================================================
-// iCare Quiz Arena — Firestore Security Rules
+// Neighbours Quiz Arena — Firestore Security Rules
 // ===============================================================
 //
 // STATUS: hardened prototype. These rules enforce tenant isolation,
