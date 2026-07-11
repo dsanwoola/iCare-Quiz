@@ -305,7 +305,7 @@ export default function HostWaitingRoom() {
         <div className="mb-3 sm:mb-4 flex items-center justify-between">
           <div className="flex items-center gap-1.5 sm:gap-2">
             <Users className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-            <h2 className="text-base sm:text-lg font-bold text-blue-900">Players</h2>
+            <h2 className="text-base sm:text-lg font-bold text-green-800">Players</h2>
             <span className="text-xs sm:text-sm text-muted-foreground">
               ({participants.length})
             </span>
@@ -317,7 +317,7 @@ export default function HostWaitingRoom() {
             <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-3 sm:mb-4">
               <Users className="w-6 h-6 sm:w-8 sm:h-8 text-muted-foreground" />
             </div>
-            <h3 className="text-base sm:text-lg font-semibold mb-1.5 sm:mb-2 text-blue-900">Waiting for players...</h3>
+            <h3 className="text-base sm:text-lg font-semibold mb-1.5 sm:mb-2 text-green-800">Waiting for players...</h3>
             <p className="text-sm sm:text-base text-muted-foreground">
               Share the game PIN above to let players join
             </p>
@@ -387,10 +387,10 @@ export default function HostWaitingRoom() {
         <Card className="mt-6 sm:mt-8 p-4 sm:p-6 rounded-xl sm:rounded-2xl bg-muted/50">
           <div className="flex items-start gap-3 sm:gap-4">
             <div className="gradient-accent w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0">
-              <Crown className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+              <Crown className="w-4 h-4 sm:w-5 sm:h-5 text-neutral-900" />
             </div>
             <div>
-              <h3 className="text-sm sm:text-base font-semibold mb-1 text-blue-900">Host Tips</h3>
+              <h3 className="text-sm sm:text-base font-semibold mb-1 text-green-800">Host Tips</h3>
               <ul className="text-xs sm:text-sm text-muted-foreground space-y-0.5 sm:space-y-1">
                 <li>• Wait for all players to join before starting</li>
                 <li>• Lock the room to prevent late joiners</li>

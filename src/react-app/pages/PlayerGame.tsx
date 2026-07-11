@@ -324,7 +324,7 @@ export default function PlayerGame() {
     : [];
 
   return (
-    <div className="min-h-[100dvh] flex flex-col bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 text-white safe-area-inset">
+    <div className="min-h-[100dvh] flex flex-col bg-gradient-to-br from-emerald-900 via-green-900 to-teal-900 text-white safe-area-inset">
       {/* Header */}
       <header className="bg-black/30 backdrop-blur-md px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between border-b border-white/10 safe-area-top">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -497,7 +497,7 @@ export default function PlayerGame() {
                 <button
                   onClick={submitOrder}
                   disabled={isSubmitting}
-                  className="mt-2 bg-white text-indigo-900 font-black text-base sm:text-xl py-3 sm:py-5 rounded-lg sm:rounded-2xl flex items-center justify-center gap-2 shadow-xl shadow-white/20 active:scale-[0.98] transition-transform disabled:opacity-50"
+                  className="mt-2 bg-white text-green-900 font-black text-base sm:text-xl py-3 sm:py-5 rounded-lg sm:rounded-2xl flex items-center justify-center gap-2 shadow-xl shadow-white/20 active:scale-[0.98] transition-transform disabled:opacity-50"
                 >
                   {isSubmitting ? (
                     <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin" />
@@ -528,7 +528,7 @@ export default function PlayerGame() {
                 <button
                   onClick={submitTyped}
                   disabled={isSubmitting || !typedAnswer.trim()}
-                  className="bg-white text-indigo-900 font-black text-base sm:text-xl py-3 sm:py-5 rounded-lg sm:rounded-2xl flex items-center justify-center gap-2 shadow-xl shadow-white/20 active:scale-[0.98] transition-transform disabled:opacity-50"
+                  className="bg-white text-green-900 font-black text-base sm:text-xl py-3 sm:py-5 rounded-lg sm:rounded-2xl flex items-center justify-center gap-2 shadow-xl shadow-white/20 active:scale-[0.98] transition-transform disabled:opacity-50"
                 >
                   {isSubmitting ? (
                     <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin" />
@@ -547,7 +547,7 @@ export default function PlayerGame() {
               <button
                 onClick={handleSubmitMulti}
                 disabled={isSubmitting}
-                className="mt-3 sm:mt-5 bg-white text-indigo-900 font-black text-sm sm:text-xl py-3 sm:py-5 rounded-lg sm:rounded-2xl flex items-center justify-center gap-2 sm:gap-3 shadow-xl shadow-white/20 active:scale-[0.98] transition-transform"
+                className="mt-3 sm:mt-5 bg-white text-green-900 font-black text-sm sm:text-xl py-3 sm:py-5 rounded-lg sm:rounded-2xl flex items-center justify-center gap-2 sm:gap-3 shadow-xl shadow-white/20 active:scale-[0.98] transition-transform"
               >
                 {isSubmitting ? (
                   <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin" />
@@ -813,7 +813,7 @@ export default function PlayerGame() {
 
             <button
               onClick={() => navigate("/join")}
-              className="mt-6 sm:mt-8 bg-white text-indigo-900 font-black text-base sm:text-lg py-3 sm:py-4 px-8 sm:px-10 rounded-xl sm:rounded-2xl shadow-xl shadow-white/20 active:scale-[0.97] transition-transform"
+              className="mt-6 sm:mt-8 bg-white text-green-900 font-black text-base sm:text-lg py-3 sm:py-4 px-8 sm:px-10 rounded-xl sm:rounded-2xl shadow-xl shadow-white/20 active:scale-[0.97] transition-transform"
             >
               Play Again
             </button>

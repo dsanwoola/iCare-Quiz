@@ -101,7 +101,7 @@ export default function HostDashboard() {
               <ArrowLeft className="w-5 h-5" />
             </Link>
             <h1 className="text-2xl font-bold">
-              <span className="text-gradient text-blue-900">My Quizzes</span>
+              <span className="text-gradient text-green-800">My Quizzes</span>
             </h1>
           </div>
           <div className="flex items-center gap-3">

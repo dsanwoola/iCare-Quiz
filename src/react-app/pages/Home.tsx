@@ -48,7 +48,7 @@ export default function HomePage() {
           </div>
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-black tracking-tight">
             <span className="text-gradient">Neighbours Quiz</span>
-            <span className="text-blue-900"> Arena</span>
+            <span className="text-yellow-500"> Arena</span>
           </h1>
         </div>
 
@@ -70,7 +70,7 @@ export default function HomePage() {
               <div className="gradient-primary w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl flex items-center justify-center mb-4 sm:mb-6 group-hover:scale-110 transition-transform">
                 <Crown className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
               </div>
-              <h2 className="text-xl sm:text-2xl font-bold mb-1 sm:mb-2 text-blue-900">Create a Quiz</h2>
+              <h2 className="text-xl sm:text-2xl font-bold mb-1 sm:mb-2 text-green-800">Create a Quiz</h2>
               <p className="text-sm sm:text-base text-muted-foreground mb-4 sm:mb-6">
                 Build your quiz, invite players, and control the game in real-time.
               </p>
@@ -85,17 +85,17 @@ export default function HomePage() {
           {/* Join Card */}
           <Link to="/join" className="group">
             <div className="relative bg-card border-2 border-secondary/20 rounded-2xl sm:rounded-3xl p-5 sm:p-8 transition-all duration-300 hover:border-secondary/50 hover:shadow-xl hover:shadow-secondary/10 hover:-translate-y-1">
-              <div className="absolute top-3 right-3 sm:top-4 sm:right-4 gradient-secondary text-white text-[10px] sm:text-xs font-bold px-2 sm:px-3 py-0.5 sm:py-1 rounded-full">
+              <div className="absolute top-3 right-3 sm:top-4 sm:right-4 gradient-secondary text-neutral-900 text-[10px] sm:text-xs font-bold px-2 sm:px-3 py-0.5 sm:py-1 rounded-full">
                 PLAYER
               </div>
               <div className="gradient-secondary w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl flex items-center justify-center mb-4 sm:mb-6 group-hover:scale-110 transition-transform">
-                <Users className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
+                <Users className="w-6 h-6 sm:w-8 sm:h-8 text-neutral-900" />
               </div>
-              <h2 className="text-xl sm:text-2xl font-bold mb-1 sm:mb-2 text-blue-900">Join a Game</h2>
+              <h2 className="text-xl sm:text-2xl font-bold mb-1 sm:mb-2 text-green-800">Join a Game</h2>
               <p className="text-sm sm:text-base text-muted-foreground mb-4 sm:mb-6">
                 Enter a game PIN to join a live quiz and compete for the top spot.
               </p>
-              <Button className="w-full gradient-secondary text-white border-0 text-base sm:text-lg h-10 sm:h-12 rounded-lg sm:rounded-xl font-semibold">
+              <Button className="w-full gradient-secondary text-neutral-900 border-0 text-base sm:text-lg h-10 sm:h-12 rounded-lg sm:rounded-xl font-semibold">
                 <Trophy className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                 Enter Game PIN
               </Button>

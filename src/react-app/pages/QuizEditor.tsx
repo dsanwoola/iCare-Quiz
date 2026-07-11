@@ -435,7 +435,7 @@ export default function QuizEditor() {
               <FileText className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-blue-900">Quiz Details</h2>
+              <h2 className="text-lg font-bold text-green-800">Quiz Details</h2>
               <p className="text-sm text-muted-foreground">
                 Give your quiz a title and description
               </p>
@@ -522,7 +522,7 @@ export default function QuizEditor() {
         {/* Questions */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-blue-900">
+            <h2 className="text-lg font-bold text-green-800">
               Questions ({questions.length})
             </h2>
           </div>

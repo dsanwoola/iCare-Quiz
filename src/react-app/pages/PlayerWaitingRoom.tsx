@@ -123,7 +123,7 @@ export default function PlayerWaitingRoom() {
         {/* Logo */}
         <div className="flex items-center justify-center gap-2 sm:gap-3 mb-6 sm:mb-8">
           <div className="gradient-secondary p-2 sm:p-3 rounded-xl sm:rounded-2xl shadow-lg shadow-secondary/30">
-            <Zap className="w-5 h-5 sm:w-7 sm:h-7 text-white" />
+            <Zap className="w-5 h-5 sm:w-7 sm:h-7 text-neutral-900" />
           </div>
           <span className="text-xl sm:text-2xl font-bold">Neighbours Quiz Arena</span>
         </div>
@@ -174,7 +174,7 @@ export default function PlayerWaitingRoom() {
             </div>
           )}
 
-          <h2 className="text-xl sm:text-2xl font-bold mb-2 sm:mb-3 text-blue-900">Get Ready!</h2>
+          <h2 className="text-xl sm:text-2xl font-bold mb-2 sm:mb-3 text-green-800">Get Ready!</h2>
           <p className="text-sm sm:text-base text-muted-foreground mb-4 sm:mb-6">
             Waiting for the host to start...
           </p>
@@ -183,7 +183,7 @@ export default function PlayerWaitingRoom() {
           <div className="h-6 sm:h-8 relative overflow-hidden">
             <p 
               key={showTip}
-              className="text-xs sm:text-sm text-secondary/80 font-medium animate-fade-in"
+              className="text-xs sm:text-sm text-primary/80 font-medium animate-fade-in"
             >
               💡 {tips[showTip]}
             </p>
@@ -193,7 +193,7 @@ export default function PlayerWaitingRoom() {
         {/* Player count */}
         <div className="bg-muted/30 backdrop-blur-sm rounded-xl sm:rounded-2xl px-4 sm:px-6 py-3 sm:py-4 inline-flex items-center gap-2.5 sm:gap-3">
           <div className="bg-secondary/20 p-1.5 sm:p-2 rounded-lg sm:rounded-xl">
-            <Users className="w-5 h-5 sm:w-6 sm:h-6 text-secondary" />
+            <Users className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
           </div>
           <div className="text-left">
             <div className="text-xl sm:text-2xl font-bold">{playerCount}</div>

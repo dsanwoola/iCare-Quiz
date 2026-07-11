@@ -133,7 +133,7 @@ export default function JoinGame() {
       {isValidatingPin ? (
         <div className="text-center">
           <div className="gradient-secondary p-4 rounded-2xl shadow-lg shadow-secondary/30 inline-block mb-6">
-            <Loader2 className="w-10 h-10 text-white animate-spin" />
+            <Loader2 className="w-10 h-10 text-neutral-900 animate-spin" />
           </div>
           <h2 className="text-xl sm:text-2xl font-bold mb-2">Finding game...</h2>
           <p className="text-muted-foreground">PIN: {gamePin}</p>
@@ -143,7 +143,7 @@ export default function JoinGame() {
         {/* Logo */}
         <div className="flex items-center justify-center gap-2 sm:gap-3 mb-6 sm:mb-10">
           <div className="gradient-secondary p-2 sm:p-3 rounded-xl sm:rounded-2xl shadow-lg shadow-secondary/30">
-            <Zap className="w-5 h-5 sm:w-7 sm:h-7 text-white" />
+            <Zap className="w-5 h-5 sm:w-7 sm:h-7 text-neutral-900" />
           </div>
           <span className="text-xl sm:text-2xl font-bold">Neighbours Quiz Arena</span>
         </div>
@@ -151,7 +151,7 @@ export default function JoinGame() {
         {step === "pin" ? (
           <form onSubmit={handlePinSubmit} className="space-y-4 sm:space-y-6">
             <div className="text-center mb-6 sm:mb-10">
-              <h1 className="text-2xl sm:text-4xl font-bold mb-2 sm:mb-3 text-blue-900">Join Game</h1>
+              <h1 className="text-2xl sm:text-4xl font-bold mb-2 sm:mb-3 text-green-800">Join Game</h1>
               <p className="text-muted-foreground text-base sm:text-lg">
                 Enter the PIN shown on screen
               </p>
@@ -176,7 +176,7 @@ export default function JoinGame() {
                 />
                 {gamePin.length === 6 && (
                   <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                    <Sparkles className="w-6 h-6 text-secondary animate-pulse" />
+                    <Sparkles className="w-6 h-6 text-primary animate-pulse" />
                   </div>
                 )}
               </div>
@@ -190,7 +190,7 @@ export default function JoinGame() {
               <Button
                 type="submit"
                 disabled={gamePin.length !== 6 || isLoading}
-                className="w-full gradient-secondary text-white border-0 h-12 sm:h-16 text-lg sm:text-xl rounded-xl sm:rounded-2xl font-bold disabled:opacity-50 shadow-lg shadow-secondary/30 active:scale-[0.98] transition-transform"
+                className="w-full gradient-secondary text-neutral-900 border-0 h-12 sm:h-16 text-lg sm:text-xl rounded-xl sm:rounded-2xl font-bold disabled:opacity-50 shadow-lg shadow-secondary/30 active:scale-[0.98] transition-transform"
               >
                 {isLoading ? (
                   <div className="w-5 h-5 sm:w-6 sm:h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
@@ -214,12 +214,12 @@ export default function JoinGame() {
               <button
                 type="button"
                 onClick={() => setStep("pin")}
-                className="inline-flex items-center gap-2 bg-secondary/10 text-secondary px-4 sm:px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-semibold mb-4 sm:mb-5 active:scale-95 transition-transform"
+                className="inline-flex items-center gap-2 bg-secondary/10 text-primary px-4 sm:px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-semibold mb-4 sm:mb-5 active:scale-95 transition-transform"
               >
                 <span className="font-mono">PIN: {gamePin}</span>
-                <span className="text-secondary/60">← tap to change</span>
+                <span className="text-primary/60">← tap to change</span>
               </button>
-              <h1 className="text-2xl sm:text-4xl font-bold mb-2 sm:mb-3 text-blue-900">Your Nickname</h1>
+              <h1 className="text-2xl sm:text-4xl font-bold mb-2 sm:mb-3 text-green-800">Your Nickname</h1>
               <p className="text-muted-foreground text-base sm:text-lg">
                 How should we call you?
               </p>
@@ -252,7 +252,7 @@ export default function JoinGame() {
               <Button
                 type="submit"
                 disabled={nickname.trim().length < 2 || isLoading}
-                className="w-full gradient-secondary text-white border-0 h-12 sm:h-16 text-lg sm:text-xl rounded-xl sm:rounded-2xl font-bold disabled:opacity-50 shadow-lg shadow-secondary/30 active:scale-[0.98] transition-transform"
+                className="w-full gradient-secondary text-neutral-900 border-0 h-12 sm:h-16 text-lg sm:text-xl rounded-xl sm:rounded-2xl font-bold disabled:opacity-50 shadow-lg shadow-secondary/30 active:scale-[0.98] transition-transform"
               >
                 {isLoading ? (
                   <div className="w-5 h-5 sm:w-6 sm:h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />

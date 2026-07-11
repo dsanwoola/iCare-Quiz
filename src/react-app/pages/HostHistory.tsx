@@ -82,7 +82,7 @@ export default function HostHistory() {
               <ArrowLeft className="w-5 h-5" />
             </Link>
             <h1 className="text-2xl font-bold">
-              <span className="text-gradient text-blue-900">Game History</span>
+              <span className="text-gradient text-green-800">Game History</span>
             </h1>
           </div>
         </div>

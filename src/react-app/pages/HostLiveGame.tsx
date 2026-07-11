@@ -270,14 +270,14 @@ export default function HostLiveGame() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-green-900 to-teal-900 flex items-center justify-center">
         <Loader2 className="w-12 h-12 text-white animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-green-900 to-teal-900 text-white">
       {/* Header */}
       <header className="bg-black/20 backdrop-blur-sm border-b border-white/10 px-6 py-3">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -572,7 +572,7 @@ export default function HostLiveGame() {
               <Button
                 size="lg"
                 onClick={handleEndGame}
-                className="bg-white text-indigo-900 hover:bg-white/90 px-8"
+                className="bg-white text-green-900 hover:bg-white/90 px-8"
               >
                 <Home className="w-5 h-5 mr-2" />
                 Back to Dashboard
