@@ -115,6 +115,42 @@ export default function HomePage() {
             Host a live quiz or jump into a game with a PIN. AI-built quizzes, team play, and instant leaderboards.
           </p>
 
+          {/* CTA band */}
+          <div className="mt-8 relative overflow-hidden gradient-primary rounded-3xl px-6 py-10 sm:py-12 text-center text-white shadow-xl shadow-primary/20">
+            <div className="absolute -top-10 -right-10 w-48 h-48 bg-yellow-400/30 rounded-full blur-2xl" />
+            <div className="relative">
+              <Trophy className="w-10 h-10 mx-auto mb-3 text-yellow-300" />
+              <h2 className="text-2xl sm:text-3xl font-black mb-2">Ready to play?</h2>
+              <p className="text-white/80 max-w-md mx-auto mb-6">
+                Spin up a quiz in minutes, or drop a PIN to join the neighbours already playing.
+              </p>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                {isHost ? (
+                  <Link to="/host">
+                    <Button className="bg-white text-green-800 hover:bg-white/90 rounded-xl h-12 px-7 text-base font-bold">
+                      <Play className="w-5 h-5 mr-2" />
+                      Go to Dashboard
+                    </Button>
+                  </Link>
+                ) : (
+                  <Button
+                    onClick={() => setAuthOpen(true)}
+                    className="bg-white text-green-800 hover:bg-white/90 rounded-xl h-12 px-7 text-base font-bold"
+                  >
+                    <Wand2 className="w-5 h-5 mr-2" />
+                    Host a Quiz
+                  </Button>
+                )}
+                <Link to="/join">
+                  <Button className="gradient-secondary text-neutral-900 border-0 rounded-xl h-12 px-7 text-base font-bold">
+                    <Share2 className="w-5 h-5 mr-2" />
+                    Join a Game
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+
           {/* Quick join */}
           <form onSubmit={joinWithPin} className="mt-8 flex flex-col sm:flex-row items-stretch gap-2 max-w-md mx-auto">
             <input
@@ -197,44 +233,6 @@ export default function HomePage() {
                 </div>
               );
             })}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA band */}
-      <section className="max-w-5xl mx-auto px-4 py-14 sm:py-20 w-full">
-        <div className="relative overflow-hidden gradient-primary rounded-3xl px-6 py-12 sm:py-16 text-center text-white shadow-xl shadow-primary/20">
-          <div className="absolute -top-10 -right-10 w-48 h-48 bg-yellow-400/30 rounded-full blur-2xl" />
-          <div className="relative">
-            <Trophy className="w-12 h-12 mx-auto mb-4 text-yellow-300" />
-            <h2 className="text-3xl sm:text-4xl font-black mb-3">Ready to play?</h2>
-            <p className="text-white/80 max-w-md mx-auto mb-8">
-              Spin up a quiz in minutes, or drop a PIN to join the neighbours already playing.
-            </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-              {isHost ? (
-                <Link to="/host">
-                  <Button className="bg-white text-green-800 hover:bg-white/90 rounded-xl h-12 px-7 text-base font-bold">
-                    <Play className="w-5 h-5 mr-2" />
-                    Go to Dashboard
-                  </Button>
-                </Link>
-              ) : (
-                <Button
-                  onClick={() => setAuthOpen(true)}
-                  className="bg-white text-green-800 hover:bg-white/90 rounded-xl h-12 px-7 text-base font-bold"
-                >
-                  <Wand2 className="w-5 h-5 mr-2" />
-                  Host a Quiz
-                </Button>
-              )}
-              <Link to="/join">
-                <Button className="gradient-secondary text-neutral-900 border-0 rounded-xl h-12 px-7 text-base font-bold">
-                  <Share2 className="w-5 h-5 mr-2" />
-                  Join a Game
-                </Button>
-              </Link>
-            </div>
           </div>
         </div>
       </section>
