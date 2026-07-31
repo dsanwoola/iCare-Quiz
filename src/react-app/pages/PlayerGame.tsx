@@ -6,6 +6,7 @@ import { isOptionType } from "@/shared/types";
 import { ArrowUp, ArrowDown } from "lucide-react";
 import { sounds, playSound, initAudio, setMuted, getMuted } from "@/react-app/lib/feedback";
 import { useWakeLock } from "@/react-app/hooks/useWakeLock";
+import CountdownRing from "@/react-app/components/CountdownRing";
 import {
   subscribeSessionRaw,
   subscribeLeaderboard,
@@ -16,7 +17,7 @@ import {
   computeTeamStandings,
 } from "@/react-app/lib/data";
 
-type GamePhase = "WAITING" | "QUESTION" | "ANSWERED" | "RESULT" | "COMPLETE";
+type GamePhase = "WAITING" | "GET_READY" | "QUESTION" | "ANSWERED" | "RESULT" | "COMPLETE";
 
 export default function PlayerGame() {
   const { gamePin } = useParams();
@@ -38,6 +39,8 @@ export default function PlayerGame() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [teamMode, setTeamMode] = useState(false);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [getReadyTotal, setGetReadyTotal] = useState(10);
+  const [getReadyRemaining, setGetReadyRemaining] = useState(0);
   const [isConnected, setIsConnected] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSoundMuted, setIsSoundMuted] = useState(() => getMuted());
@@ -46,6 +49,7 @@ export default function PlayerGame() {
   const questionStartTime = useRef<number | null>(null);
   const lastQuestionId = useRef<string | null>(null);
   const resultLoadedFor = useRef<string | null>(null);
+  const getReadyStartRef = useRef<number | null>(null);
 
   // Establish (or restore) the player's anonymous identity before reading data.
   useEffect(() => {
@@ -132,11 +136,12 @@ export default function PlayerGame() {
 
       if (cq.questionStatus === "OPEN") {
         setPhase((currentPhase) => {
-          if (currentPhase === "WAITING") {
+          if (currentPhase === "WAITING" || currentPhase === "GET_READY") {
             if (!hasPlayedQuestionSound.current) {
               hasPlayedQuestionSound.current = true;
               playSound(sounds.questionAppear);
             }
+            questionStartTime.current = Date.now();
             return "QUESTION";
           }
           return currentPhase;
@@ -155,12 +160,33 @@ export default function PlayerGame() {
             .catch(() => {});
         }
       } else if (cq.questionStatus === "CLOSED") {
-        setPhase((currentPhase) => (currentPhase === "QUESTION" ? "ANSWERED" : currentPhase));
+        const cdStarted = data.countdownStartedAt;
+        if (cdStarted && typeof cdStarted.toMillis === "function") {
+          // Host has started the "get ready" countdown for the next question.
+          getReadyStartRef.current = cdStarted.toMillis();
+          setGetReadyTotal(data.getReadySeconds ?? 10);
+          setPhase((p) => (p === "COMPLETE" ? "COMPLETE" : "GET_READY"));
+        } else {
+          setPhase((currentPhase) => (currentPhase === "QUESTION" ? "ANSWERED" : currentPhase));
+        }
       }
     });
 
     return unsub;
   }, [sessionId, participantId, navigate, authReady]);
+
+  // Get-ready countdown animation.
+  useEffect(() => {
+    if (phase !== "GET_READY") return;
+    const tick = () => {
+      const started = getReadyStartRef.current;
+      if (!started) return;
+      setGetReadyRemaining(Math.max(0, getReadyTotal - (Date.now() - started) / 1000));
+    };
+    tick();
+    const id = setInterval(tick, 100);
+    return () => clearInterval(id);
+  }, [phase, getReadyTotal]);
 
   // Timer countdown with sound effects
   useEffect(() => {
@@ -391,6 +417,20 @@ export default function PlayerGame() {
                 <span className="text-white/70"> of </span>
                 <span className="font-bold">{question.totalQuestions}</span>
               </div>
+            )}
+          </div>
+        )}
+
+        {/* Get ready countdown */}
+        {phase === "GET_READY" && (
+          <div className="flex-1 flex flex-col items-center justify-center text-center px-4">
+            <p className="uppercase tracking-[0.2em] text-white/50 mb-6 text-sm">Get ready!</p>
+            <CountdownRing total={getReadyTotal} remaining={getReadyRemaining} size={200} className="text-yellow-300" />
+            <h2 className="mt-8 text-2xl sm:text-3xl font-black">Next question incoming…</h2>
+            {question && (
+              <p className="text-white/60 mt-2">
+                Question {question.questionIndex + 1} of {question.totalQuestions}
+              </p>
             )}
           </div>
         )}

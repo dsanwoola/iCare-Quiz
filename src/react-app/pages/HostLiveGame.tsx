@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { sounds, playSound, initAudio, setMuted, getMuted } from "@/react-app/lib/feedback";
 import { useWakeLock } from "@/react-app/hooks/useWakeLock";
+import CountdownRing from "@/react-app/components/CountdownRing";
 import type {
   SessionInfo,
   CurrentQuestion,
@@ -34,6 +35,7 @@ import {
   getSession,
   getQuiz,
   openQuestion,
+  startCountdown,
   closeQuestion,
   revealQuestion,
   nextQuestion,
@@ -46,7 +48,7 @@ import {
   exportSessionCsv,
 } from "@/react-app/lib/data";
 
-type GamePhase = "PREVIEW" | "QUESTION_OPEN" | "QUESTION_CLOSED" | "REVEAL" | "LEADERBOARD" | "COMPLETE";
+type GamePhase = "PREVIEW" | "GET_READY" | "QUESTION_OPEN" | "QUESTION_CLOSED" | "REVEAL" | "LEADERBOARD" | "COMPLETE";
 
 export default function HostLiveGame() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -67,6 +69,7 @@ export default function HostLiveGame() {
   const [actionLoading, setActionLoading] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [answerCount, setAnswerCount] = useState(0);
+  const [countdownRemaining, setCountdownRemaining] = useState(0);
   const [isSoundMuted, setIsSoundMuted] = useState(() => getMuted());
   const lastTickTime = useRef<number | null>(null);
 
@@ -207,6 +210,45 @@ export default function HostLiveGame() {
     }
   };
 
+  // Kick off the "get ready" countdown; players see the synced animated timer.
+  const handleStartCountdown = async () => {
+    if (!sessionId) return;
+    initAudio();
+    playSound(sounds.gameStart);
+    setCountdownRemaining(session?.getReadySeconds ?? 10);
+    setPhase("GET_READY");
+    try {
+      await startCountdown(sessionId);
+    } catch {
+      /* the countdown still runs locally; players just won't sync */
+    }
+  };
+
+  // Drive the get-ready countdown and auto-open the question when it ends.
+  useEffect(() => {
+    if (phase !== "GET_READY") return;
+    const total = session?.getReadySeconds ?? 10;
+    const started = Date.now();
+    lastTickTime.current = null;
+    const id = setInterval(() => {
+      const rem = total - (Date.now() - started) / 1000;
+      if (rem <= 0) {
+        clearInterval(id);
+        setCountdownRemaining(0);
+        handleOpenQuestion();
+        return;
+      }
+      const whole = Math.ceil(rem);
+      if (whole <= 3 && whole !== lastTickTime.current) {
+        lastTickTime.current = whole;
+        playSound(sounds.tick);
+      }
+      setCountdownRemaining(rem);
+    }, 100);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
   const handleCloseQuestion = async () => {
     if (!sessionId) return;
     setActionLoading(true);
@@ -308,6 +350,18 @@ export default function HostLiveGame() {
 
       {/* Main Content */}
       <main className="max-w-5xl mx-auto px-6 py-8">
+        {/* Get-ready countdown */}
+        {phase === "GET_READY" && question && (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <p className="uppercase tracking-[0.2em] text-white/50 mb-6 text-sm">Get ready…</p>
+            <CountdownRing total={session?.getReadySeconds ?? 10} remaining={countdownRemaining} size={220} className="text-yellow-300" />
+            <h2 className="mt-8 text-3xl font-bold">
+              Question {question.questionIndex + 1} of {question.totalQuestions}
+            </h2>
+            <p className="text-white/60 mt-2">Everyone, grab your phones!</p>
+          </div>
+        )}
+
         {/* Question Preview / Active / Reveal */}
         {(phase === "PREVIEW" || phase === "QUESTION_OPEN" || phase === "QUESTION_CLOSED" || phase === "REVEAL") && question && (
           <div className="space-y-8">
@@ -490,12 +544,25 @@ export default function HostLiveGame() {
           {phase === "PREVIEW" && (
             <Button
               size="lg"
-              onClick={handleOpenQuestion}
+              onClick={handleStartCountdown}
               disabled={actionLoading}
               className="bg-green-500 hover:bg-green-600 text-white px-8"
             >
-              {actionLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5 mr-2" />}
-              Start Question
+              <Play className="w-5 h-5 mr-2" />
+              Start Question ({session?.getReadySeconds ?? 10}s get-ready)
+            </Button>
+          )}
+
+          {phase === "GET_READY" && (
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={handleOpenQuestion}
+              disabled={actionLoading}
+              className="border-white/30 text-white hover:bg-white/10 px-8"
+            >
+              <ChevronRight className="w-5 h-5 mr-2" />
+              Skip — open question now
             </Button>
           )}
 

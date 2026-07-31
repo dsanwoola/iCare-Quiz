@@ -17,9 +17,9 @@ import {
   Sparkles,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import { Users2 } from "lucide-react";
+import { Users2, Timer } from "lucide-react";
 import type { SessionInfo, ParticipantInfo, Question } from "@/shared/types";
-import { PRESET_TEAMS } from "@/shared/types";
+import { PRESET_TEAMS, GET_READY_OPTIONS } from "@/shared/types";
 import {
   createSession as createSessionApi,
   getSession,
@@ -28,6 +28,7 @@ import {
   setRoomLocked,
   kickParticipant,
   setTeamMode,
+  setGetReadySeconds,
   startGame as startGameApi,
 } from "@/react-app/lib/data";
 
@@ -283,6 +284,38 @@ export default function HostWaitingRoom() {
               Teams: {session?.teamMode ? "On" : "Off"}
             </Button>
           </div>
+
+          {/* Get-ready countdown interval */}
+          {session && (
+            <div className="mt-4 flex items-center justify-center gap-2 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                <Timer className="w-4 h-4" />
+                Get-ready countdown:
+              </span>
+              <div className="inline-flex rounded-xl border border-border overflow-hidden">
+                {GET_READY_OPTIONS.map((s) => (
+                  <button
+                    key={s}
+                    onClick={async () => {
+                      setSession({ ...session, getReadySeconds: s });
+                      try {
+                        await setGetReadySeconds(session.id, s);
+                      } catch {
+                        /* revert handled by next load */
+                      }
+                    }}
+                    className={`px-3 sm:px-4 py-1.5 text-sm font-semibold transition-colors ${
+                      session.getReadySeconds === s
+                        ? "gradient-primary text-white"
+                        : "bg-card text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {s}s
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {session && (
             <div className="mt-6 sm:mt-8 flex flex-col items-center gap-2">

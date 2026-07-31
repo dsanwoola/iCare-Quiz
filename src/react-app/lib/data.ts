@@ -204,6 +204,7 @@ function sessionInfoFromDoc(id: string, data: DocumentData): SessionInfo {
     isRoomLocked: !!data.isRoomLocked,
     teamMode: !!data.teamMode,
     teams: (data.teams ?? []) as Team[],
+    getReadySeconds: data.getReadySeconds ?? 10,
     createdAt: tsToIso(data.createdAt),
   };
 }
@@ -265,6 +266,8 @@ export async function createSession(quizId: string): Promise<SessionInfo> {
     isRoomLocked: false,
     teamMode: false,
     teams: [],
+    getReadySeconds: 10,
+    countdownStartedAt: null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
@@ -412,6 +415,23 @@ export async function setRoomLocked(sessionId: string, locked: boolean): Promise
   });
 }
 
+/** Set the "get ready" countdown interval (seconds) shown before each question. */
+export async function setGetReadySeconds(sessionId: string, seconds: number): Promise<void> {
+  await updateDoc(doc(db, "sessions", sessionId), {
+    getReadySeconds: seconds,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/** Start the pre-question "get ready" countdown (players see the animated timer).
+ *  questionStatus stays CLOSED so no answers can be submitted yet. */
+export async function startCountdown(sessionId: string): Promise<void> {
+  await updateDoc(doc(db, "sessions", sessionId), {
+    countdownStartedAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+}
+
 /** Enable/disable team mode. Enabling assigns existing players to teams. */
 export async function setTeamMode(sessionId: string, enabled: boolean): Promise<void> {
   const sessionRef = doc(db, "sessions", sessionId);
@@ -510,6 +530,7 @@ async function setQuestion(
     questionStartedAt: status === "OPEN" ? serverTimestamp() : null,
     currentQuestion: q ? publicQuestionFrom(q, index, questions.length) : null,
     revealedAnswers: null,
+    countdownStartedAt: null,
     updatedAt: serverTimestamp(),
   });
 }
@@ -521,6 +542,7 @@ export async function startGame(sessionId: string, questions: Question[]): Promi
     questionStatus: "CLOSED",
     currentQuestion: questions[0] ? publicQuestionFrom(questions[0], 0, questions.length) : null,
     revealedAnswers: null,
+    countdownStartedAt: null,
     updatedAt: serverTimestamp(),
   });
 }
@@ -530,6 +552,7 @@ export async function openQuestion(sessionId: string): Promise<void> {
     questionStatus: "OPEN",
     questionStartedAt: serverTimestamp(),
     revealedAnswers: null,
+    countdownStartedAt: null,
     updatedAt: serverTimestamp(),
   });
 }

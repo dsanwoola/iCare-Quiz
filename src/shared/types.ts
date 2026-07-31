@@ -131,8 +131,12 @@ export interface SessionInfo {
   isRoomLocked: boolean;
   teamMode: boolean;
   teams: Team[];
+  getReadySeconds: number;
   createdAt: string;
 }
+
+/** Allowed "get ready" countdown intervals (seconds). */
+export const GET_READY_OPTIONS = [10, 20, 30] as const;
 
 export interface ParticipantInfo {
   id: string;
