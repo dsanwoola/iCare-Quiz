@@ -28,6 +28,24 @@ const db = getFirestore();
 const adminAuth = getAuth();
 
 const app = express();
+
+// Canonical host: once the custom domain is verified and serving, set
+// CANONICAL_HOST (e.g. "neighbours.cloud") to 301-redirect every other host
+// — the default *.hosted.app URL and www.neighbours.cloud — to it. Stays
+// dormant until the env var is set, so it can never redirect to a domain that
+// isn't live yet. /api/ is exempt so server-to-server calls (the Flutterwave
+// webhook) are never redirected.
+const CANONICAL_HOST = (process.env.CANONICAL_HOST || "").toLowerCase();
+if (CANONICAL_HOST) {
+  app.use((req, res, next) => {
+    const host = (req.headers.host || "").toLowerCase();
+    if (host && host !== CANONICAL_HOST && !req.path.startsWith("/api/")) {
+      return res.redirect(301, `https://${CANONICAL_HOST}${req.originalUrl}`);
+    }
+    next();
+  });
+}
+
 app.use(express.json());
 
 // ---- helpers -------------------------------------------------------------
