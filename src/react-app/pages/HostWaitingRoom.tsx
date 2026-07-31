@@ -33,7 +33,6 @@ import {
   setSessionAd,
   startGame as startGameApi,
 } from "@/react-app/lib/data";
-import { useAuth } from "@/react-app/hooks/useAuth";
 import { useAppConfig } from "@/react-app/hooks/useAppConfig";
 
 export default function HostWaitingRoom() {
@@ -54,9 +53,7 @@ export default function HostWaitingRoom() {
   const [adText, setAdText] = useState("");
   const [adSaved, setAdSaved] = useState(false);
   const { showError } = useToast();
-  const { user } = useAuth();
-  const { config, isPro } = useAppConfig();
-  const pro = isPro(user?.email);
+  const { config, isProUser: pro } = useAppConfig();
 
   const applyGameMode = async (mode: GameMode) => {
     if (!session) return;
@@ -121,7 +118,7 @@ export default function HostWaitingRoom() {
           return;
         }
         // Apply the admin's app-wide default pacing for Pro hosts on new games.
-        if (!urlSessionId && data.gameMode === "manual" && config.defaultGameMode === "auto" && isPro(user?.email)) {
+        if (!urlSessionId && data.gameMode === "manual" && config.defaultGameMode === "auto" && pro) {
           data = { ...data, gameMode: "auto" };
           setGameMode(data.id, "auto").catch(() => {});
         }
@@ -421,6 +418,18 @@ export default function HostWaitingRoom() {
                   ? "Shown to players between questions. Leave blank to show the default ad."
                   : "Players see a “your ad here” slot between questions — sell it once you're Pro."}
               </p>
+            </div>
+          )}
+
+          {session && !pro && (
+            <div className="mt-4 text-center">
+              <Link
+                to="/upgrade"
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
+              >
+                <Sparkle className="w-4 h-4 text-yellow-500" />
+                Upgrade to Pro to unlock Automatic mode & sponsor ads →
+              </Link>
             </div>
           )}
 

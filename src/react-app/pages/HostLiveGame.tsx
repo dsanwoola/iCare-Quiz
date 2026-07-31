@@ -22,7 +22,6 @@ import { useWakeLock } from "@/react-app/hooks/useWakeLock";
 import CountdownRing from "@/react-app/components/CountdownRing";
 import CountdownAdSlot from "@/react-app/components/CountdownAd";
 import { useAppConfig } from "@/react-app/hooks/useAppConfig";
-import { useAuth } from "@/react-app/hooks/useAuth";
 import type {
   SessionInfo,
   CurrentQuestion,
@@ -58,8 +57,7 @@ type GamePhase = "PREVIEW" | "GET_READY" | "QUESTION_OPEN" | "QUESTION_CLOSED" |
 export default function HostLiveGame() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
-  const { config, isPro } = useAppConfig();
-  const { user } = useAuth();
+  const { config, isProUser } = useAppConfig();
 
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -322,7 +320,7 @@ export default function HostLiveGame() {
   const toggleMode = async () => {
     if (!sessionId || !session) return;
     const next: "manual" | "auto" = isAuto ? "manual" : "auto";
-    if (next === "auto" && !isPro(user?.email)) {
+    if (next === "auto" && !isProUser) {
       return; // Pro-gated; the toggle is hidden for non-Pro anyway.
     }
     setSession({ ...session, gameMode: next });
@@ -381,7 +379,7 @@ export default function HostLiveGame() {
             >
               {isSoundMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
             </button>
-            {(isAuto || isPro(user?.email)) && phase !== "COMPLETE" && (
+            {(isAuto || isProUser) && phase !== "COMPLETE" && (
               <button
                 onClick={toggleMode}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${

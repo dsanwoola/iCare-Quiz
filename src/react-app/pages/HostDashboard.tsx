@@ -21,6 +21,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "@/react-app/hooks/useAuth";
+import { useAppConfig } from "@/react-app/hooks/useAppConfig";
 import QuizShareModal from "@/react-app/components/QuizShareModal";
 import AIGenerateModal from "@/react-app/components/AIGenerateModal";
 import PublishTemplateModal from "@/react-app/components/PublishTemplateModal";
@@ -39,6 +40,7 @@ export default function HostDashboard() {
   const [publishQuiz, setPublishQuiz] = useState<{ id: string; title: string } | null>(null);
   const { showError, showSuccess } = useToast();
   const { isAdmin } = useAuth();
+  const { isProUser } = useAppConfig();
 
   useEffect(() => {
     fetchQuizzes();
@@ -108,6 +110,14 @@ export default function HostDashboard() {
             </h1>
           </div>
           <div className="flex items-center gap-3">
+            {!isProUser && (
+              <Link to="/upgrade">
+                <Button variant="outline" className="rounded-xl border-yellow-400 text-yellow-700">
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Go Pro
+                </Button>
+              </Link>
+            )}
             {isAdmin && (
               <Link to="/admin">
                 <Button variant="outline" className="rounded-xl border-primary/40 text-primary">

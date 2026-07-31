@@ -44,6 +44,7 @@ import type {
   AppConfig,
   CountdownAd,
   GameMode,
+  Subscription,
 } from "@/shared/types";
 import { PRESET_TEAMS, DEFAULT_APP_CONFIG } from "@/shared/types";
 import { STARTER_TEMPLATES } from "@/react-app/data/templates";
@@ -195,12 +196,19 @@ export async function uploadLogo(file: File): Promise<string> {
 const APP_CONFIG_REF = () => doc(db, "config", "app");
 
 function appConfigFrom(data: DocumentData | undefined): AppConfig {
+  const p = data?.proPlan ?? {};
   return {
     defaultGameMode: data?.defaultGameMode === "auto" ? "auto" : "manual",
     defaultCountdownSeconds: data?.defaultCountdownSeconds ?? DEFAULT_APP_CONFIG.defaultCountdownSeconds,
     countdownSoundEnabled: data?.countdownSoundEnabled ?? DEFAULT_APP_CONFIG.countdownSoundEnabled,
     defaultAd: (data?.defaultAd as CountdownAd) ?? null,
     proEmails: (data?.proEmails as string[]) ?? [],
+    proPlan: {
+      name: p.name ?? DEFAULT_APP_CONFIG.proPlan.name,
+      amount: typeof p.amount === "number" ? p.amount : DEFAULT_APP_CONFIG.proPlan.amount,
+      currency: p.currency ?? DEFAULT_APP_CONFIG.proPlan.currency,
+      interval: p.interval === "annual" ? "annual" : "monthly",
+    },
   };
 }
 
@@ -224,6 +232,48 @@ export async function getAppConfig(): Promise<AppConfig> {
 /** Admin-only (enforced by rules). */
 export async function updateAppConfig(patch: Partial<AppConfig>): Promise<void> {
   await setDoc(APP_CONFIG_REF(), { ...patch, updatedAt: serverTimestamp() }, { merge: true });
+}
+
+// ============================================
+// Billing / Pro subscription (Flutterwave)
+// ============================================
+
+/** Live read of the signed-in user's paid subscription (server-written). */
+export function subscribeSubscription(uid: string, cb: (sub: Subscription | null) => void): () => void {
+  return onSnapshot(
+    doc(db, "subscribers", uid),
+    (snap) => {
+      if (!snap.exists()) return cb(null);
+      const d = snap.data();
+      const expires = d.expiresAt instanceof Timestamp ? d.expiresAt.toDate() : null;
+      const active = d.status === "active" && (!expires || expires.getTime() > Date.now());
+      cb({ status: active ? "active" : "expired", plan: d.plan || "Pro", expiresAt: expires?.toISOString() ?? null });
+    },
+    () => cb(null)
+  );
+}
+
+/** Ask the backend for a Flutterwave hosted-checkout link. */
+export async function startProCheckout(): Promise<string> {
+  const token = await auth.currentUser?.getIdToken();
+  const res = await fetch("/api/billing/checkout", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: "{}",
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok || !j.link) throw new Error(j.error || "Could not start checkout.");
+  return j.link as string;
+}
+
+/** Verify a transaction after the Flutterwave redirect; grants Pro server-side. */
+export async function verifyProPayment(transactionId: string): Promise<string> {
+  const token = await auth.currentUser?.getIdToken();
+  const res = await fetch(`/api/billing/verify?transaction_id=${encodeURIComponent(transactionId)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const j = await res.json().catch(() => ({ status: "error" }));
+  return (j.status as string) || "failed";
 }
 
 // ============================================

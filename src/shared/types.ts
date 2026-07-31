@@ -161,6 +161,21 @@ export const HOUSE_AD: CountdownAd = {
   url: null,
 };
 
+/** The paid "Pro" plan, priced by the admin (charged via Flutterwave). */
+export interface ProPlan {
+  name: string;
+  amount: number;
+  currency: string; // e.g. NGN, USD, GHS, KES
+  interval: "monthly" | "annual";
+}
+
+export const DEFAULT_PRO_PLAN: ProPlan = {
+  name: "Pro",
+  amount: 5000,
+  currency: "NGN",
+  interval: "monthly",
+};
+
 /** App-wide settings an admin controls (Firestore: config/app). */
 export interface AppConfig {
   defaultGameMode: GameMode;
@@ -168,6 +183,7 @@ export interface AppConfig {
   countdownSoundEnabled: boolean;
   defaultAd: CountdownAd | null;
   proEmails: string[];
+  proPlan: ProPlan;
 }
 
 export const DEFAULT_APP_CONFIG: AppConfig = {
@@ -176,7 +192,15 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   countdownSoundEnabled: true,
   defaultAd: null,
   proEmails: [],
+  proPlan: DEFAULT_PRO_PLAN,
 };
+
+/** A user's paid subscription record (Firestore: subscribers/{uid}). */
+export interface Subscription {
+  status: "active" | "expired";
+  plan: string;
+  expiresAt: string | null;
+}
 
 // The app admin(s). Enforced in Firestore rules too.
 export const ADMIN_EMAILS = ["dsanwoola@gmail.com"];

@@ -5,6 +5,8 @@ import { AppConfigProvider } from "@/react-app/hooks/useAppConfig";
 import HomePage from "@/react-app/pages/Home";
 import AdminPage from "@/react-app/pages/Admin";
 import RequireAdmin from "@/react-app/components/RequireAdmin";
+import UpgradePage from "@/react-app/pages/Upgrade";
+import BillingCallback from "@/react-app/pages/BillingCallback";
 import HostDashboard from "@/react-app/pages/HostDashboard";
 import HostHistory from "@/react-app/pages/HostHistory";
 import QuizEditor from "@/react-app/pages/QuizEditor";
@@ -27,6 +29,8 @@ export default function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/templates" element={<TemplatesPage />} />
         <Route path="/admin" element={<RequireAdmin><AdminPage /></RequireAdmin>} />
+        <Route path="/upgrade" element={<RequireHost><UpgradePage /></RequireHost>} />
+        <Route path="/billing/callback" element={<RequireHost><BillingCallback /></RequireHost>} />
         <Route path="/host" element={<RequireHost><HostDashboard /></RequireHost>} />
         <Route path="/host/history" element={<RequireHost><HostHistory /></RequireHost>} />
         <Route path="/host/create" element={<RequireHost><QuizEditor /></RequireHost>} />

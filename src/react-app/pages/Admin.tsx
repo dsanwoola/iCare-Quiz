@@ -23,6 +23,10 @@ export default function AdminPage() {
   const [adImage, setAdImage] = useState("");
   const [adUrl, setAdUrl] = useState("");
   const [proEmails, setProEmails] = useState("");
+  const [planName, setPlanName] = useState("Pro");
+  const [planAmount, setPlanAmount] = useState("5000");
+  const [planCurrency, setPlanCurrency] = useState("NGN");
+  const [planInterval, setPlanInterval] = useState<"monthly" | "annual">("monthly");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -34,6 +38,10 @@ export default function AdminPage() {
     setAdImage(config.defaultAd?.imageUrl ?? "");
     setAdUrl(config.defaultAd?.url ?? "");
     setProEmails(config.proEmails.join("\n"));
+    setPlanName(config.proPlan.name);
+    setPlanAmount(String(config.proPlan.amount));
+    setPlanCurrency(config.proPlan.currency);
+    setPlanInterval(config.proPlan.interval);
   }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = async () => {
@@ -51,6 +59,12 @@ export default function AdminPage() {
           ? { text: adText.trim(), imageUrl: adImage.trim() || null, url: adUrl.trim() || null }
           : null,
         proEmails: emails,
+        proPlan: {
+          name: planName.trim() || "Pro",
+          amount: Math.max(0, Number(planAmount) || 0),
+          currency: (planCurrency.trim() || "NGN").toUpperCase(),
+          interval: planInterval,
+        },
       });
       showSuccess("Settings saved", "Applies to new games across the app");
     } catch {
@@ -149,6 +163,56 @@ export default function AdminPage() {
                 <Input placeholder="Ad text" value={adText} onChange={(e) => setAdText(e.target.value)} className="rounded-xl" />
                 <Input placeholder="Image URL (optional)" value={adImage} onChange={(e) => setAdImage(e.target.value)} className="rounded-xl" />
                 <Input placeholder="Link URL (optional)" value={adUrl} onChange={(e) => setAdUrl(e.target.value)} className="rounded-xl" />
+              </div>
+            </Card>
+
+            {/* Pro plan pricing (Flutterwave) */}
+            <Card className="p-6 rounded-2xl border-2">
+              <h2 className="font-bold text-lg mb-1">Pro plan pricing</h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                What hosts pay to unlock Pro, charged via Flutterwave.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className="text-sm font-medium mb-1.5 block">Plan name</label>
+                  <Input value={planName} onChange={(e) => setPlanName(e.target.value)} className="rounded-xl" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Amount</label>
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    value={planAmount}
+                    onChange={(e) => setPlanAmount(e.target.value)}
+                    className="rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Currency</label>
+                  <Input
+                    value={planCurrency}
+                    onChange={(e) => setPlanCurrency(e.target.value.toUpperCase())}
+                    maxLength={3}
+                    placeholder="NGN"
+                    className="rounded-xl uppercase"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-sm font-medium mb-1.5 block">Billing interval</label>
+                  <div className="inline-flex rounded-xl border border-border overflow-hidden">
+                    {(["monthly", "annual"] as const).map((iv) => (
+                      <button
+                        key={iv}
+                        onClick={() => setPlanInterval(iv)}
+                        className={`px-5 py-2 text-sm font-semibold capitalize transition-colors ${
+                          planInterval === iv ? "gradient-primary text-white" : "bg-card text-muted-foreground hover:bg-muted"
+                        }`}
+                      >
+                        {iv}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </Card>
 
