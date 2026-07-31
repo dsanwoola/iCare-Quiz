@@ -20,6 +20,9 @@ import {
 import { sounds, playSound, initAudio, setMuted, getMuted } from "@/react-app/lib/feedback";
 import { useWakeLock } from "@/react-app/hooks/useWakeLock";
 import CountdownRing from "@/react-app/components/CountdownRing";
+import CountdownAdSlot from "@/react-app/components/CountdownAd";
+import { useAppConfig } from "@/react-app/hooks/useAppConfig";
+import { useAuth } from "@/react-app/hooks/useAuth";
 import type {
   SessionInfo,
   CurrentQuestion,
@@ -45,14 +48,18 @@ import {
   subscribeAnswerCount,
   subscribeParticipants,
   computeTeamStandings,
+  setGameMode,
   exportSessionCsv,
 } from "@/react-app/lib/data";
+import { Zap, Hand } from "lucide-react";
 
 type GamePhase = "PREVIEW" | "GET_READY" | "QUESTION_OPEN" | "QUESTION_CLOSED" | "REVEAL" | "LEADERBOARD" | "COMPLETE";
 
 export default function HostLiveGame() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
+  const { config, isPro } = useAppConfig();
+  const { user } = useAuth();
 
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -310,6 +317,36 @@ export default function HostLiveGame() {
     navigate("/host");
   };
 
+  const isAuto = session?.gameMode === "auto";
+
+  const toggleMode = async () => {
+    if (!sessionId || !session) return;
+    const next: "manual" | "auto" = isAuto ? "manual" : "auto";
+    if (next === "auto" && !isPro(user?.email)) {
+      return; // Pro-gated; the toggle is hidden for non-Pro anyway.
+    }
+    setSession({ ...session, gameMode: next });
+    try {
+      await setGameMode(sessionId, next);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  // AUTO MODE: advance the game without host clicks. Each phase schedules the
+  // next action; switching to manual (or a manual click) cancels the timer.
+  useEffect(() => {
+    if (!isAuto) return;
+    let t: ReturnType<typeof setTimeout> | undefined;
+    if (phase === "PREVIEW") t = setTimeout(() => handleStartCountdown(), 1200);
+    else if (phase === "QUESTION_CLOSED") t = setTimeout(() => handleRevealAnswer(), 2500);
+    else if (phase === "REVEAL") t = setTimeout(() => handleNextQuestion(), 5000);
+    return () => {
+      if (t) clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, isAuto]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-green-900 to-teal-900 flex items-center justify-center">
@@ -344,6 +381,18 @@ export default function HostLiveGame() {
             >
               {isSoundMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
             </button>
+            {(isAuto || isPro(user?.email)) && phase !== "COMPLETE" && (
+              <button
+                onClick={toggleMode}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+                  isAuto ? "bg-yellow-400 text-neutral-900" : "bg-white/10 hover:bg-white/20"
+                }`}
+                title={isAuto ? "Switch to manual control" : "Let the game run automatically"}
+              >
+                {isAuto ? <Zap className="w-4 h-4" /> : <Hand className="w-4 h-4" />}
+                {isAuto ? "Auto" : "Manual"}
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -359,6 +408,9 @@ export default function HostLiveGame() {
               Question {question.questionIndex + 1} of {question.totalQuestions}
             </h2>
             <p className="text-white/60 mt-2">Everyone, grab your phones!</p>
+            <div className="mt-8 w-full">
+              <CountdownAdSlot sessionAd={session?.ad} defaultAd={config.defaultAd} dark />
+            </div>
           </div>
         )}
 

@@ -132,11 +132,65 @@ export interface SessionInfo {
   teamMode: boolean;
   teams: Team[];
   getReadySeconds: number;
+  gameMode: GameMode;
+  ad: CountdownAd | null;
   createdAt: string;
 }
 
 /** Allowed "get ready" countdown intervals (seconds). */
 export const GET_READY_OPTIONS = [10, 20, 30] as const;
+
+// ============================================
+// Game mode, ads, admin & plans
+// ============================================
+
+// manual = host clicks through; auto = the game advances itself (Pro only).
+export type GameMode = "manual" | "auto";
+
+/** A sponsor/ad shown on the "get ready" countdown screen. */
+export interface CountdownAd {
+  text: string;
+  imageUrl?: string | null;
+  url?: string | null;
+}
+
+/** House ad shown by default — invites people to buy the slot. */
+export const HOUSE_AD: CountdownAd = {
+  text: "📣 Your ad here — reach every player between questions. Tap to advertise.",
+  imageUrl: null,
+  url: null,
+};
+
+/** App-wide settings an admin controls (Firestore: config/app). */
+export interface AppConfig {
+  defaultGameMode: GameMode;
+  defaultCountdownSeconds: number;
+  countdownSoundEnabled: boolean;
+  defaultAd: CountdownAd | null;
+  proEmails: string[];
+}
+
+export const DEFAULT_APP_CONFIG: AppConfig = {
+  defaultGameMode: "manual",
+  defaultCountdownSeconds: 10,
+  countdownSoundEnabled: true,
+  defaultAd: null,
+  proEmails: [],
+};
+
+// The app admin(s). Enforced in Firestore rules too.
+export const ADMIN_EMAILS = ["dsanwoola@gmail.com"];
+
+export function isAdminEmail(email?: string | null): boolean {
+  return !!email && ADMIN_EMAILS.includes(email.toLowerCase());
+}
+
+/** A user is "Pro" if they're an admin or their email is on the pro list. */
+export function isProEmail(email: string | null | undefined, proEmails: string[]): boolean {
+  if (!email) return false;
+  const e = email.toLowerCase();
+  return isAdminEmail(e) || proEmails.map((x) => x.toLowerCase()).includes(e);
+}
 
 export interface ParticipantInfo {
   id: string;

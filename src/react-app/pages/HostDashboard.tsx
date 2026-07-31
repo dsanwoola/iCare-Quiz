@@ -18,7 +18,9 @@ import {
   BarChart3,
   Globe,
   LayoutTemplate,
+  ShieldCheck,
 } from "lucide-react";
+import { useAuth } from "@/react-app/hooks/useAuth";
 import QuizShareModal from "@/react-app/components/QuizShareModal";
 import AIGenerateModal from "@/react-app/components/AIGenerateModal";
 import PublishTemplateModal from "@/react-app/components/PublishTemplateModal";
@@ -36,6 +38,7 @@ export default function HostDashboard() {
   const [aiOpen, setAiOpen] = useState(false);
   const [publishQuiz, setPublishQuiz] = useState<{ id: string; title: string } | null>(null);
   const { showError, showSuccess } = useToast();
+  const { isAdmin } = useAuth();
 
   useEffect(() => {
     fetchQuizzes();
@@ -105,6 +108,14 @@ export default function HostDashboard() {
             </h1>
           </div>
           <div className="flex items-center gap-3">
+            {isAdmin && (
+              <Link to="/admin">
+                <Button variant="outline" className="rounded-xl border-primary/40 text-primary">
+                  <ShieldCheck className="w-4 h-4 mr-2" />
+                  Admin
+                </Button>
+              </Link>
+            )}
             <Link to="/templates">
               <Button variant="outline" className="rounded-xl">
                 <LayoutTemplate className="w-4 h-4 mr-2" />

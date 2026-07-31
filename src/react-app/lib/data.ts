@@ -41,8 +41,11 @@ import type {
   SessionStatus,
   Team,
   TeamStanding,
+  AppConfig,
+  CountdownAd,
+  GameMode,
 } from "@/shared/types";
-import { PRESET_TEAMS } from "@/shared/types";
+import { PRESET_TEAMS, DEFAULT_APP_CONFIG } from "@/shared/types";
 import { STARTER_TEMPLATES } from "@/react-app/data/templates";
 
 // ============================================
@@ -186,6 +189,44 @@ export async function uploadLogo(file: File): Promise<string> {
 }
 
 // ============================================
+// App configuration (admin-controlled, public read)
+// ============================================
+
+const APP_CONFIG_REF = () => doc(db, "config", "app");
+
+function appConfigFrom(data: DocumentData | undefined): AppConfig {
+  return {
+    defaultGameMode: data?.defaultGameMode === "auto" ? "auto" : "manual",
+    defaultCountdownSeconds: data?.defaultCountdownSeconds ?? DEFAULT_APP_CONFIG.defaultCountdownSeconds,
+    countdownSoundEnabled: data?.countdownSoundEnabled ?? DEFAULT_APP_CONFIG.countdownSoundEnabled,
+    defaultAd: (data?.defaultAd as CountdownAd) ?? null,
+    proEmails: (data?.proEmails as string[]) ?? [],
+  };
+}
+
+export function subscribeAppConfig(cb: (config: AppConfig) => void): () => void {
+  return onSnapshot(
+    APP_CONFIG_REF(),
+    (snap) => cb(appConfigFrom(snap.exists() ? snap.data() : undefined)),
+    () => cb(DEFAULT_APP_CONFIG)
+  );
+}
+
+export async function getAppConfig(): Promise<AppConfig> {
+  try {
+    const snap = await getDoc(APP_CONFIG_REF());
+    return appConfigFrom(snap.exists() ? snap.data() : undefined);
+  } catch {
+    return DEFAULT_APP_CONFIG;
+  }
+}
+
+/** Admin-only (enforced by rules). */
+export async function updateAppConfig(patch: Partial<AppConfig>): Promise<void> {
+  await setDoc(APP_CONFIG_REF(), { ...patch, updatedAt: serverTimestamp() }, { merge: true });
+}
+
+// ============================================
 // Sessions
 // ============================================
 
@@ -205,6 +246,8 @@ function sessionInfoFromDoc(id: string, data: DocumentData): SessionInfo {
     teamMode: !!data.teamMode,
     teams: (data.teams ?? []) as Team[],
     getReadySeconds: data.getReadySeconds ?? 10,
+    gameMode: data.gameMode === "auto" ? "auto" : "manual",
+    ad: (data.ad as CountdownAd) ?? null,
     createdAt: tsToIso(data.createdAt),
   };
 }
@@ -249,6 +292,7 @@ export async function createSession(quizId: string): Promise<SessionInfo> {
   }
 
   const pin = await generateUniquePin();
+  const config = await getAppConfig();
   const ref = await addDoc(collection(db, "sessions"), {
     quizId,
     hostUid: uid,
@@ -266,7 +310,9 @@ export async function createSession(quizId: string): Promise<SessionInfo> {
     isRoomLocked: false,
     teamMode: false,
     teams: [],
-    getReadySeconds: 10,
+    getReadySeconds: config.defaultCountdownSeconds ?? 10,
+    gameMode: "manual",
+    ad: null,
     countdownStartedAt: null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -419,6 +465,22 @@ export async function setRoomLocked(sessionId: string, locked: boolean): Promise
 export async function setGetReadySeconds(sessionId: string, seconds: number): Promise<void> {
   await updateDoc(doc(db, "sessions", sessionId), {
     getReadySeconds: seconds,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/** manual (host clicks through) or auto (game self-advances; Pro hosts only). */
+export async function setGameMode(sessionId: string, mode: GameMode): Promise<void> {
+  await updateDoc(doc(db, "sessions", sessionId), {
+    gameMode: mode,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/** Set (or clear) the sponsor ad shown on the get-ready countdown for this game. */
+export async function setSessionAd(sessionId: string, ad: CountdownAd | null): Promise<void> {
+  await updateDoc(doc(db, "sessions", sessionId), {
+    ad: ad,
     updatedAt: serverTimestamp(),
   });
 }

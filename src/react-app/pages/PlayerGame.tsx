@@ -7,6 +7,9 @@ import { ArrowUp, ArrowDown } from "lucide-react";
 import { sounds, playSound, initAudio, setMuted, getMuted } from "@/react-app/lib/feedback";
 import { useWakeLock } from "@/react-app/hooks/useWakeLock";
 import CountdownRing from "@/react-app/components/CountdownRing";
+import CountdownAdSlot from "@/react-app/components/CountdownAd";
+import { useAppConfig } from "@/react-app/hooks/useAppConfig";
+import type { CountdownAd } from "@/shared/types";
 import {
   subscribeSessionRaw,
   subscribeLeaderboard,
@@ -22,6 +25,7 @@ type GamePhase = "WAITING" | "GET_READY" | "QUESTION" | "ANSWERED" | "RESULT" | 
 export default function PlayerGame() {
   const { gamePin } = useParams();
   const navigate = useNavigate();
+  const { config } = useAppConfig();
 
   const [nickname] = useState(() => sessionStorage.getItem("nickname") || "Player");
   const [sessionId] = useState(() => sessionStorage.getItem("sessionId"));
@@ -41,6 +45,7 @@ export default function PlayerGame() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [getReadyTotal, setGetReadyTotal] = useState(10);
   const [getReadyRemaining, setGetReadyRemaining] = useState(0);
+  const [sessionAd, setSessionAd] = useState<CountdownAd | null>(null);
   const [isConnected, setIsConnected] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSoundMuted, setIsSoundMuted] = useState(() => getMuted());
@@ -109,6 +114,7 @@ export default function PlayerGame() {
       setIsConnected(true);
       setTeamMode(!!data.teamMode);
       setTeams((data.teams || []) as Team[]);
+      setSessionAd((data.ad as CountdownAd) ?? null);
 
       if (data.status === "ENDED") {
         setPhase((p) => (p === "COMPLETE" ? p : "COMPLETE"));
@@ -175,18 +181,25 @@ export default function PlayerGame() {
     return unsub;
   }, [sessionId, participantId, navigate, authReady]);
 
-  // Get-ready countdown animation.
+  // Get-ready countdown animation + optional tick sound.
   useEffect(() => {
     if (phase !== "GET_READY") return;
+    let lastWhole = -1;
     const tick = () => {
       const started = getReadyStartRef.current;
       if (!started) return;
-      setGetReadyRemaining(Math.max(0, getReadyTotal - (Date.now() - started) / 1000));
+      const rem = Math.max(0, getReadyTotal - (Date.now() - started) / 1000);
+      setGetReadyRemaining(rem);
+      const whole = Math.ceil(rem);
+      if (whole !== lastWhole && whole <= 3 && whole > 0) {
+        lastWhole = whole;
+        if (config.countdownSoundEnabled) playSound(sounds.tick);
+      }
     };
     tick();
     const id = setInterval(tick, 100);
     return () => clearInterval(id);
-  }, [phase, getReadyTotal]);
+  }, [phase, getReadyTotal, config.countdownSoundEnabled]);
 
   // Timer countdown with sound effects
   useEffect(() => {
@@ -432,6 +445,9 @@ export default function PlayerGame() {
                 Question {question.questionIndex + 1} of {question.totalQuestions}
               </p>
             )}
+            <div className="mt-8 w-full">
+              <CountdownAdSlot sessionAd={sessionAd} defaultAd={config.defaultAd} dark />
+            </div>
           </div>
         )}
 

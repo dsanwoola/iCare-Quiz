@@ -1,7 +1,10 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router";
 import { ToastProvider } from "@/react-app/components/ui/toast";
 import { AuthProvider } from "@/react-app/hooks/useAuth";
+import { AppConfigProvider } from "@/react-app/hooks/useAppConfig";
 import HomePage from "@/react-app/pages/Home";
+import AdminPage from "@/react-app/pages/Admin";
+import RequireAdmin from "@/react-app/components/RequireAdmin";
 import HostDashboard from "@/react-app/pages/HostDashboard";
 import HostHistory from "@/react-app/pages/HostHistory";
 import QuizEditor from "@/react-app/pages/QuizEditor";
@@ -17,11 +20,13 @@ import RequireHost from "@/react-app/components/RequireHost";
 export default function App() {
   return (
     <AuthProvider>
+    <AppConfigProvider>
     <ToastProvider>
     <Router>
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/templates" element={<TemplatesPage />} />
+        <Route path="/admin" element={<RequireAdmin><AdminPage /></RequireAdmin>} />
         <Route path="/host" element={<RequireHost><HostDashboard /></RequireHost>} />
         <Route path="/host/history" element={<RequireHost><HostHistory /></RequireHost>} />
         <Route path="/host/create" element={<RequireHost><QuizEditor /></RequireHost>} />
@@ -37,6 +42,7 @@ export default function App() {
       </Routes>
     </Router>
     </ToastProvider>
+    </AppConfigProvider>
     </AuthProvider>
   );
 }

@@ -17,8 +17,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import { Users2, Timer } from "lucide-react";
-import type { SessionInfo, ParticipantInfo, Question } from "@/shared/types";
+import { Users2, Timer, Zap, Hand, Megaphone, Sparkle } from "lucide-react";
+import type { SessionInfo, ParticipantInfo, Question, GameMode } from "@/shared/types";
 import { PRESET_TEAMS, GET_READY_OPTIONS } from "@/shared/types";
 import {
   createSession as createSessionApi,
@@ -29,8 +29,12 @@ import {
   kickParticipant,
   setTeamMode,
   setGetReadySeconds,
+  setGameMode,
+  setSessionAd,
   startGame as startGameApi,
 } from "@/react-app/lib/data";
+import { useAuth } from "@/react-app/hooks/useAuth";
+import { useAppConfig } from "@/react-app/hooks/useAppConfig";
 
 export default function HostWaitingRoom() {
   const [searchParams] = useSearchParams();
@@ -47,7 +51,35 @@ export default function HostWaitingRoom() {
   const [isLocking, setIsLocking] = useState(false);
   const [isTogglingTeams, setIsTogglingTeams] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
+  const [adText, setAdText] = useState("");
+  const [adSaved, setAdSaved] = useState(false);
   const { showError } = useToast();
+  const { user } = useAuth();
+  const { config, isPro } = useAppConfig();
+  const pro = isPro(user?.email);
+
+  const applyGameMode = async (mode: GameMode) => {
+    if (!session) return;
+    if (mode === "auto" && !pro) {
+      showError("Automatic mode is a Pro feature", "Ask an admin to upgrade your account.");
+      return;
+    }
+    setSession({ ...session, gameMode: mode });
+    try {
+      await setGameMode(session.id, mode);
+    } catch {
+      /* reverts on next load */
+    }
+  };
+
+  const saveAd = async () => {
+    if (!session) return;
+    const text = adText.trim();
+    await setSessionAd(session.id, text ? { text, imageUrl: null, url: null } : null);
+    setSession({ ...session, ad: text ? { text, imageUrl: null, url: null } : null });
+    setAdSaved(true);
+    setTimeout(() => setAdSaved(false), 1500);
+  };
 
   const toggleTeamMode = async () => {
     if (!session) return;
@@ -88,7 +120,13 @@ export default function HostWaitingRoom() {
           setError("No quiz selected");
           return;
         }
+        // Apply the admin's app-wide default pacing for Pro hosts on new games.
+        if (!urlSessionId && data.gameMode === "manual" && config.defaultGameMode === "auto" && isPro(user?.email)) {
+          data = { ...data, gameMode: "auto" };
+          setGameMode(data.id, "auto").catch(() => {});
+        }
         setSession(data);
+        setAdText(data.ad?.text ?? "");
         const quiz = await getQuiz(data.quizId);
         setQuestions(quiz.questions);
       } catch (err) {
@@ -314,6 +352,75 @@ export default function HostWaitingRoom() {
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Game pacing: manual vs automatic (Pro) */}
+          {session && (
+            <div className="mt-4 flex items-center justify-center gap-2 flex-wrap">
+              <span className="text-sm text-muted-foreground">Pacing:</span>
+              <div className="inline-flex rounded-xl border border-border overflow-hidden">
+                {(["manual", "auto"] as GameMode[]).map((m) => {
+                  const active = session.gameMode === m;
+                  const locked = m === "auto" && !pro;
+                  return (
+                    <button
+                      key={m}
+                      onClick={() => applyGameMode(m)}
+                      className={`px-3 sm:px-4 py-1.5 text-sm font-semibold inline-flex items-center gap-1.5 transition-colors ${
+                        active ? "gradient-primary text-white" : "bg-card text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      {m === "auto" ? <Zap className="w-3.5 h-3.5" /> : <Hand className="w-3.5 h-3.5" />}
+                      {m === "auto" ? "Automatic" : "Manual"}
+                      {locked && (
+                        <span className="ml-0.5 inline-flex items-center gap-0.5 text-[10px] font-bold text-yellow-600">
+                          <Sparkle className="w-3 h-3" />
+                          PRO
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {session?.gameMode === "auto" && (
+            <p className="mt-2 text-center text-xs text-muted-foreground">
+              ⚡ The game runs itself — questions open, close, reveal and advance automatically.
+            </p>
+          )}
+
+          {/* Sponsor slot for the get-ready screen (Pro) */}
+          {session && (
+            <div className="mt-5 max-w-md mx-auto">
+              <label className="flex items-center gap-1.5 text-sm font-medium mb-1.5 justify-center">
+                <Megaphone className="w-4 h-4 text-primary" />
+                Sponsor message
+                {!pro && (
+                  <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-yellow-600">
+                    <Sparkle className="w-3 h-3" /> PRO
+                  </span>
+                )}
+              </label>
+              <div className="flex gap-2">
+                <input
+                  value={adText}
+                  onChange={(e) => setAdText(e.target.value)}
+                  disabled={!pro}
+                  maxLength={120}
+                  placeholder={pro ? "e.g. Snacks by Mama's Kitchen — order at table 4!" : "Upgrade to Pro to sponsor the countdown"}
+                  className="flex-1 h-10 rounded-xl border border-border bg-card px-3 text-sm focus:outline-none focus:border-primary disabled:opacity-60"
+                />
+                <Button variant="outline" className="rounded-xl h-10" disabled={!pro} onClick={saveAd}>
+                  {adSaved ? <Check className="w-4 h-4 text-success" /> : "Save"}
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground text-center mt-1.5">
+                {pro
+                  ? "Shown to players between questions. Leave blank to show the default ad."
+                  : "Players see a “your ad here” slot between questions — sell it once you're Pro."}
+              </p>
             </div>
           )}
 

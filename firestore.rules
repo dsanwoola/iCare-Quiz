@@ -101,6 +101,20 @@ service cloud.firestore {
       allow delete: if isOwner(resource.data.ownerUid);
     }
 
+    // App administrator(s), by email. Keep in sync with ADMIN_EMAILS in code.
+    function isAdmin() {
+      return isAuthed() && request.auth.token.email != null &&
+        request.auth.token.email.lower() == 'dsanwoola@gmail.com';
+    }
+
+    // ---------- App config (admin-controlled; publicly readable) ----------
+    // Holds app-wide defaults (game mode, countdown, ad, pro list). Read by
+    // every client; only an admin may write.
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // ---------- Public template library ----------
     // Templates are shared, reusable quizzes. They are intentionally
     // world-readable (the whole point is to browse & clone them), so they must

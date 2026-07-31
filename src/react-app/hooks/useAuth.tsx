@@ -10,6 +10,7 @@ import {
   type User as FirebaseUser,
 } from "firebase/auth";
 import { auth } from "@/react-app/lib/firebase";
+import { isAdminEmail } from "@/shared/types";
 
 interface User {
   id: string;
@@ -23,6 +24,8 @@ interface AuthContextValue {
   user: User | null;
   /** A real (non-anonymous) host account, allowed to create & run quizzes. */
   isHost: boolean;
+  /** App administrator (by email allow-list). */
+  isAdmin: boolean;
   isPending: boolean;
   loginWithGoogle: () => Promise<void>;
   loginWithEmail: (email: string, password: string) => Promise<void>;
@@ -73,10 +76,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const isHost = !!user && !user.isAnonymous;
+  const isAdmin = isHost && isAdminEmail(user?.email);
 
   return (
     <AuthContext.Provider
-      value={{ user, isHost, isPending, loginWithGoogle, loginWithEmail, signUpWithEmail, logout }}
+      value={{ user, isHost, isAdmin, isPending, loginWithGoogle, loginWithEmail, signUpWithEmail, logout }}
     >
       {children}
     </AuthContext.Provider>
