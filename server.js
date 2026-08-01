@@ -29,15 +29,6 @@ const adminAuth = getAuth();
 
 const app = express();
 
-// Temporary debug: report the host headers the container actually receives.
-app.get("/__whoami", (req, res) => {
-  res.json({
-    host: req.headers.host || null,
-    xForwardedHost: req.headers["x-forwarded-host"] || null,
-    forwarded: req.headers.forwarded || null,
-  });
-});
-
 // Canonical host: once the custom domain is verified and serving, set
 // CANONICAL_HOST (e.g. "neighbours.cloud") to 301-redirect every other host —
 // the default *.hosted.app URL and www.neighbours.cloud — to it. App Hosting
