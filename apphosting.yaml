@@ -12,3 +12,12 @@ runConfig:
   minInstances: 0
   maxInstances: 2
   concurrency: 80
+
+# The custom domain is verified and serving HTTPS, so make it canonical:
+# server.js 301-redirects the default *.hosted.app URL and www.neighbours.cloud
+# to https://neighbours.cloud (/api/ is exempt so webhooks aren't redirected).
+env:
+  - variable: CANONICAL_HOST
+    value: neighbours.cloud
+    availability:
+      - RUNTIME
