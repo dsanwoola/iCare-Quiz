@@ -29,17 +29,33 @@ const adminAuth = getAuth();
 
 const app = express();
 
+// Temporary debug: report the host headers the container actually receives.
+app.get("/__whoami", (req, res) => {
+  res.json({
+    host: req.headers.host || null,
+    xForwardedHost: req.headers["x-forwarded-host"] || null,
+    forwarded: req.headers.forwarded || null,
+  });
+});
+
 // Canonical host: once the custom domain is verified and serving, set
-// CANONICAL_HOST (e.g. "neighbours.cloud") to 301-redirect every other host
-// — the default *.hosted.app URL and www.neighbours.cloud — to it. Stays
-// dormant until the env var is set, so it can never redirect to a domain that
-// isn't live yet. /api/ is exempt so server-to-server calls (the Flutterwave
-// webhook) are never redirected.
+// CANONICAL_HOST (e.g. "neighbours.cloud") to 301-redirect every other host —
+// the default *.hosted.app URL and www.neighbours.cloud — to it. App Hosting
+// terminates the custom domain at its load balancer and forwards the INTERNAL
+// host in the plain Host header, so we read the true external host from
+// x-forwarded-host and deliberately do NOT fall back to Host: if that header
+// is absent we simply skip the redirect, so an apex request can never be
+// redirected to itself (no loop). /api/ is exempt so the Flutterwave webhook
+// (a server-to-server POST) is never redirected.
 const CANONICAL_HOST = (process.env.CANONICAL_HOST || "").toLowerCase();
 if (CANONICAL_HOST) {
   app.use((req, res, next) => {
-    const host = (req.headers.host || "").toLowerCase();
-    if (host && host !== CANONICAL_HOST && !req.path.startsWith("/api/")) {
+    const ext = (req.headers["x-forwarded-host"] || "")
+      .split(",")[0]
+      .trim()
+      .split(":")[0]
+      .toLowerCase();
+    if (ext && ext !== CANONICAL_HOST && !req.path.startsWith("/api/")) {
       return res.redirect(301, `https://${CANONICAL_HOST}${req.originalUrl}`);
     }
     next();
