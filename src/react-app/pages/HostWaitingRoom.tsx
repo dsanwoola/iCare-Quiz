@@ -33,6 +33,8 @@ import {
   setSessionAd,
   setSessionCover,
   setScheduledStart,
+  setSessionMaxPlayers,
+  setSessionBrand,
   uploadLogo,
   startGame as startGameApi,
 } from "@/react-app/lib/data";
@@ -56,13 +58,16 @@ export default function HostWaitingRoom() {
   const [isStarting, setIsStarting] = useState(false);
   const [adText, setAdText] = useState("");
   const [adSaved, setAdSaved] = useState(false);
+  const [brandName, setBrandName] = useState("");
+  const [brandSaved, setBrandSaved] = useState(false);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [scheduleInput, setScheduleInput] = useState("");
   const [nowMs, setNowMs] = useState(() => Date.now());
   const coverInputRef = useRef<HTMLInputElement>(null);
   const autoStartedRef = useRef(false);
   const { showError } = useToast();
-  const { config, isProUser: pro } = useAppConfig();
+  const { config, tier, atLeast, isProUser: pro } = useAppConfig();
+  const biz = atLeast("business");
 
   const applyGameMode = async (mode: GameMode) => {
     if (!session) return;
@@ -85,6 +90,16 @@ export default function HostWaitingRoom() {
     setSession({ ...session, ad: text ? { text, imageUrl: null, url: null } : null });
     setAdSaved(true);
     setTimeout(() => setAdSaved(false), 1500);
+  };
+
+  // Business: white-label brand name shown to players.
+  const saveBrand = async () => {
+    if (!session) return;
+    const name = brandName.trim() || null;
+    await setSessionBrand(session.id, name);
+    setSession({ ...session, brandName: name });
+    setBrandSaved(true);
+    setTimeout(() => setBrandSaved(false), 1500);
   };
 
   // Pro: full-screen lobby cover image.
@@ -297,6 +312,19 @@ export default function HostWaitingRoom() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nowMs, startAtMs, questions.length]);
+
+  // Stamp the join cap from the host's tier so the (public) session doc carries
+  // it for the join screen to enforce.
+  useEffect(() => {
+    if (!session) return;
+    setBrandName(session.brandName ?? "");
+    const cap = config.limits.maxPlayers[tier];
+    if (session.maxPlayers !== cap) {
+      setSession((s) => (s ? { ...s, maxPlayers: cap } : s));
+      setSessionMaxPlayers(session.id, cap).catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.id, tier, config]);
 
   if (isLoading) {
     return (
@@ -644,6 +672,39 @@ export default function HostWaitingRoom() {
                 {pro
                   ? "Shown to players between questions. Leave blank to show the default ad."
                   : "Players see a “your ad here” slot between questions — sell it once you're Pro."}
+              </p>
+            </div>
+          )}
+
+          {/* White-label brand (Business) */}
+          {session && (
+            <div className="mt-5 max-w-md mx-auto">
+              <label className="flex items-center gap-1.5 text-sm font-medium mb-1.5 justify-center">
+                <Sparkle className="w-4 h-4 text-primary" />
+                White-label brand
+                {!biz && (
+                  <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-yellow-600">
+                    <Sparkle className="w-3 h-3" /> BUSINESS
+                  </span>
+                )}
+              </label>
+              <div className="flex gap-2">
+                <input
+                  value={brandName}
+                  onChange={(e) => setBrandName(e.target.value)}
+                  disabled={!biz}
+                  maxLength={40}
+                  placeholder={biz ? "e.g. Mama's Kitchen Quiz Night" : "Upgrade to Business to remove app branding"}
+                  className="flex-1 h-10 rounded-xl border border-border bg-card px-3 text-sm focus:outline-none focus:border-primary disabled:opacity-60"
+                />
+                <Button variant="outline" className="rounded-xl h-10" disabled={!biz} onClick={saveBrand}>
+                  {brandSaved ? <Check className="w-4 h-4 text-success" /> : "Save"}
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground text-center mt-1.5">
+                {biz
+                  ? "Replaces “Neighbours Quiz Arena” on players' screens. Leave blank to show the app name."
+                  : "Business hosts can show their own brand instead of the app name."}
               </p>
             </div>
           )}

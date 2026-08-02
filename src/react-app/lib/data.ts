@@ -45,6 +45,7 @@ import type {
   CountdownAd,
   GameMode,
   Subscription,
+  Tier,
 } from "@/shared/types";
 import { PRESET_TEAMS, DEFAULT_APP_CONFIG } from "@/shared/types";
 import { STARTER_TEMPLATES } from "@/react-app/data/templates";
@@ -197,19 +198,49 @@ const APP_CONFIG_REF = () => doc(db, "config", "app");
 
 function appConfigFrom(data: DocumentData | undefined): AppConfig {
   const p = data?.proPlan ?? {};
+  const D = DEFAULT_APP_CONFIG;
+  const plans = data?.plans ?? {};
+  const limits = data?.limits ?? {};
+  const mp = limits.maxPlayers ?? {};
+  const aq = limits.aiMonthlyQuota ?? {};
+  const num = (v: unknown, fallback: number) => (typeof v === "number" ? v : fallback);
   return {
     defaultGameMode: data?.defaultGameMode === "auto" ? "auto" : "manual",
-    defaultCountdownSeconds: data?.defaultCountdownSeconds ?? DEFAULT_APP_CONFIG.defaultCountdownSeconds,
-    countdownSoundEnabled: data?.countdownSoundEnabled ?? DEFAULT_APP_CONFIG.countdownSoundEnabled,
+    defaultCountdownSeconds: data?.defaultCountdownSeconds ?? D.defaultCountdownSeconds,
+    countdownSoundEnabled: data?.countdownSoundEnabled ?? D.countdownSoundEnabled,
     defaultAd: (data?.defaultAd as CountdownAd) ?? null,
     defaultCoverImageUrl: data?.defaultCoverImageUrl ?? null,
     proEmails: (data?.proEmails as string[]) ?? [],
     proPlan: {
-      name: p.name ?? DEFAULT_APP_CONFIG.proPlan.name,
-      amount: typeof p.amount === "number" ? p.amount : DEFAULT_APP_CONFIG.proPlan.amount,
-      currency: p.currency ?? DEFAULT_APP_CONFIG.proPlan.currency,
+      name: p.name ?? D.proPlan.name,
+      amount: num(p.amount, D.proPlan.amount),
+      currency: p.currency ?? D.proPlan.currency,
       interval: p.interval === "annual" ? "annual" : "monthly",
     },
+    plans: {
+      currency: plans.currency ?? D.plans.currency,
+      pro: {
+        monthlyAmount: num(plans.pro?.monthlyAmount, D.plans.pro.monthlyAmount),
+        annualAmount: num(plans.pro?.annualAmount, D.plans.pro.annualAmount),
+      },
+      business: {
+        monthlyAmount: num(plans.business?.monthlyAmount, D.plans.business.monthlyAmount),
+        annualAmount: num(plans.business?.annualAmount, D.plans.business.annualAmount),
+      },
+    },
+    limits: {
+      maxPlayers: {
+        free: num(mp.free, D.limits.maxPlayers.free),
+        pro: num(mp.pro, D.limits.maxPlayers.pro),
+        business: num(mp.business, D.limits.maxPlayers.business),
+      },
+      aiMonthlyQuota: {
+        free: num(aq.free, D.limits.aiMonthlyQuota.free),
+        pro: num(aq.pro, D.limits.aiMonthlyQuota.pro),
+        business: num(aq.business, D.limits.aiMonthlyQuota.business),
+      },
+    },
+    trialDays: num(data?.trialDays, D.trialDays),
   };
 }
 
@@ -247,24 +278,48 @@ export function subscribeSubscription(uid: string, cb: (sub: Subscription | null
       if (!snap.exists()) return cb(null);
       const d = snap.data();
       const expires = d.expiresAt instanceof Timestamp ? d.expiresAt.toDate() : null;
-      const active = d.status === "active" && (!expires || expires.getTime() > Date.now());
-      cb({ status: active ? "active" : "expired", plan: d.plan || "Pro", expiresAt: expires?.toISOString() ?? null });
+      const notExpired = !expires || expires.getTime() > Date.now();
+      const live = (d.status === "active" || d.status === "trialing") && notExpired;
+      const tier: Tier = d.tier === "business" ? "business" : d.tier === "pro" ? "pro" : "free";
+      cb({
+        status: live ? (d.status === "trialing" ? "trialing" : "active") : "expired",
+        plan: d.plan || "Pro",
+        tier: live ? tier : "free",
+        expiresAt: expires?.toISOString() ?? null,
+      });
     },
     () => cb(null)
   );
 }
 
-/** Ask the backend for a Flutterwave hosted-checkout link. */
-export async function startProCheckout(): Promise<string> {
+/** Ask the backend for a Flutterwave hosted-checkout link for a tier + interval. */
+export async function startProCheckout(
+  tier: "pro" | "business" = "pro",
+  interval: "monthly" | "annual" = "monthly"
+): Promise<string> {
   const token = await auth.currentUser?.getIdToken();
   const res = await fetch("/api/billing/checkout", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ tier, interval }),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok || !j.link) throw new Error(j.error || "Could not start checkout.");
+  return j.link as string;
+}
+
+/** Start the one-time free trial (server grants Pro for config.trialDays). */
+export async function startTrial(): Promise<void> {
+  const token = await auth.currentUser?.getIdToken();
+  const res = await fetch("/api/billing/trial", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: "{}",
   });
   const j = await res.json().catch(() => ({}));
-  if (!res.ok || !j.link) throw new Error(j.error || "Could not start checkout.");
-  return j.link as string;
+  if (!res.ok || !j.ok) throw new Error(j.error || "Could not start your trial.");
+  // Refresh the ID token so the new tier claim applies immediately.
+  await auth.currentUser?.getIdToken(true);
 }
 
 /** Verify a transaction after the Flutterwave redirect; grants Pro server-side. */
@@ -274,6 +329,8 @@ export async function verifyProPayment(transactionId: string): Promise<string> {
     headers: { Authorization: `Bearer ${token}` },
   });
   const j = await res.json().catch(() => ({ status: "error" }));
+  // On success, refresh the ID token so the new tier claim applies immediately.
+  if (j.status === "success") await auth.currentUser?.getIdToken(true);
   return (j.status as string) || "failed";
 }
 
@@ -301,6 +358,9 @@ function sessionInfoFromDoc(id: string, data: DocumentData): SessionInfo {
     ad: (data.ad as CountdownAd) ?? null,
     coverImageUrl: data.coverImageUrl ?? null,
     scheduledStartAt: typeof data.scheduledStartAt === "number" ? data.scheduledStartAt : null,
+    maxPlayers:
+      typeof data.maxPlayers === "number" ? data.maxPlayers : DEFAULT_APP_CONFIG.limits.maxPlayers.free,
+    brandName: data.brandName ?? null,
     createdAt: tsToIso(data.createdAt),
   };
 }
@@ -368,6 +428,8 @@ export async function createSession(quizId: string): Promise<SessionInfo> {
     ad: null,
     coverImageUrl: null,
     scheduledStartAt: null,
+    maxPlayers: config.limits.maxPlayers.free,
+    brandName: null,
     countdownStartedAt: null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -438,6 +500,13 @@ export async function joinSession(pin: string, nickname: string): Promise<JoinRe
     (p) => p.data().nickname?.toLowerCase() === nickname.toLowerCase()
   );
   if (taken) throw new Error("This nickname is already taken. Choose another.");
+
+  // Soft player cap by the host's tier (stamped on the session).
+  const cap =
+    typeof session.maxPlayers === "number" ? session.maxPlayers : DEFAULT_APP_CONFIG.limits.maxPlayers.free;
+  if (active.length >= cap) {
+    throw new Error("This game is full — the host needs a bigger plan to add more players.");
+  }
 
   // Auto-assign a team (round-robin) when the room is in team mode.
   let team: Team | null = null;
@@ -556,6 +625,38 @@ export async function setScheduledStart(sessionId: string, startAtMs: number | n
     scheduledStartAt: startAtMs,
     updatedAt: serverTimestamp(),
   });
+}
+
+/** Stamp the join cap on the session (from the host's tier). */
+export async function setSessionMaxPlayers(sessionId: string, maxPlayers: number): Promise<void> {
+  await updateDoc(doc(db, "sessions", sessionId), {
+    maxPlayers: maxPlayers,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/** Business: white-label brand name shown to players (or null to clear). */
+export async function setSessionBrand(sessionId: string, brandName: string | null): Promise<void> {
+  await updateDoc(doc(db, "sessions", sessionId), {
+    brandName: brandName,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/** Soft per-host monthly AI-generation quota (usage/{uid}). quota < 0 = unlimited.
+ *  Reserves one generation; throws when the tier's monthly quota is exhausted. */
+export async function consumeAiQuota(quota: number): Promise<void> {
+  if (quota < 0) return; // unlimited
+  const uid = requireUid();
+  const ref = doc(db, "usage", uid);
+  const snap = await getDoc(ref);
+  const month = new Date().toISOString().slice(0, 7); // YYYY-MM
+  const d = snap.exists() ? snap.data() : {};
+  const count = d.month === month ? Number(d.aiCount) || 0 : 0;
+  if (count >= quota) {
+    throw new Error(`You've used all ${quota} AI generations this month — upgrade for more.`);
+  }
+  await setDoc(ref, { month, aiCount: count + 1, updatedAt: serverTimestamp() }, { merge: true });
 }
 
 /** Start the pre-question "get ready" countdown (players see the animated timer).

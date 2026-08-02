@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import type { AppConfig, Subscription } from "@/shared/types";
-import { DEFAULT_APP_CONFIG, isProEmail, isAdminEmail } from "@/shared/types";
+import type { AppConfig, Subscription, Tier } from "@/shared/types";
+import { DEFAULT_APP_CONFIG, isProEmail, isAdminEmail, tierAtLeast } from "@/shared/types";
 import { subscribeAppConfig, subscribeSubscription } from "@/react-app/lib/data";
 import { useAuth } from "@/react-app/hooks/useAuth";
 
@@ -9,7 +9,11 @@ interface AppConfigContextValue {
   loading: boolean;
   /** The signed-in user's paid subscription (null if none). */
   subscription: Subscription | null;
-  /** Is the signed-in user Pro? (admin, comped email, or an active subscription) */
+  /** The signed-in user's effective tier (admin → business; comp → pro; else sub or free). */
+  tier: Tier;
+  /** True when the effective tier is at least `min`. */
+  atLeast: (min: Tier) => boolean;
+  /** Is the signed-in user Pro or higher? (back-compat convenience) */
   isProUser: boolean;
   /** Is the given email Pro via admin/comp list (not per-user subscription)? */
   isPro: (email?: string | null) => boolean;
@@ -39,10 +43,12 @@ export function AppConfigProvider({ children }: { children: ReactNode }) {
   }, [isHost, user?.id]);
 
   const email = user?.email ?? null;
-  const isProUser =
-    isAdminEmail(email) ||
-    isProEmail(email, config.proEmails) ||
-    subscription?.status === "active";
+  const tier: Tier = isAdminEmail(email)
+    ? "business"
+    : isProEmail(email, config.proEmails)
+    ? "pro"
+    : subscription?.tier ?? "free";
+  const atLeast = (min: Tier) => tierAtLeast(tier, min);
 
   return (
     <AppConfigContext.Provider
@@ -50,7 +56,9 @@ export function AppConfigProvider({ children }: { children: ReactNode }) {
         config,
         loading,
         subscription,
-        isProUser,
+        tier,
+        atLeast,
+        isProUser: atLeast("pro"),
         isPro: (e) => isProEmail(e ?? null, config.proEmails),
       }}
     >

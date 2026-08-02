@@ -17,7 +17,8 @@ import {
 } from "@/react-app/components/ui/select";
 import { Sparkles, Wand2 } from "lucide-react";
 import { generateQuiz, type GenerateQuizOptions } from "@/react-app/lib/ai";
-import { createQuiz } from "@/react-app/lib/data";
+import { createQuiz, consumeAiQuota } from "@/react-app/lib/data";
+import { useAppConfig } from "@/react-app/hooks/useAppConfig";
 
 interface AIGenerateModalProps {
   open: boolean;
@@ -28,6 +29,7 @@ const EXAMPLES = ["World capitals", "1990s pop music", "Human anatomy", "JavaScr
 
 export default function AIGenerateModal({ open, onOpenChange }: AIGenerateModalProps) {
   const navigate = useNavigate();
+  const { config, tier } = useAppConfig();
   const [topic, setTopic] = useState("");
   const [count, setCount] = useState("10");
   const [difficulty, setDifficulty] = useState<GenerateQuizOptions["difficulty"]>("Medium");
@@ -42,6 +44,8 @@ export default function AIGenerateModal({ open, onOpenChange }: AIGenerateModalP
     setError(null);
     setLoading(true);
     try {
+      // Soft monthly AI quota by tier (unlimited for Business).
+      await consumeAiQuota(config.limits.aiMonthlyQuota[tier]);
       const quiz = await generateQuiz({
         topic: topic.trim(),
         count: parseInt(count),

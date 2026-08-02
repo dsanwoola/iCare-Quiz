@@ -26,10 +26,18 @@ export default function AdminPage() {
   const [uploadingCover, setUploadingCover] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const [proEmails, setProEmails] = useState("");
-  const [planName, setPlanName] = useState("Pro");
-  const [planAmount, setPlanAmount] = useState("5000");
-  const [planCurrency, setPlanCurrency] = useState("NGN");
-  const [planInterval, setPlanInterval] = useState<"monthly" | "annual">("monthly");
+  const [catCurrency, setCatCurrency] = useState("NGN");
+  const [proMo, setProMo] = useState("5000");
+  const [proYr, setProYr] = useState("50000");
+  const [bizMo, setBizMo] = useState("20000");
+  const [bizYr, setBizYr] = useState("200000");
+  const [capFree, setCapFree] = useState("10");
+  const [capPro, setCapPro] = useState("300");
+  const [capBiz, setCapBiz] = useState("2000");
+  const [aiFree, setAiFree] = useState("3");
+  const [aiPro, setAiPro] = useState("50");
+  const [aiBiz, setAiBiz] = useState("-1");
+  const [trialDays, setTrialDays] = useState("7");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -42,10 +50,18 @@ export default function AdminPage() {
     setAdUrl(config.defaultAd?.url ?? "");
     setCoverUrl(config.defaultCoverImageUrl ?? "");
     setProEmails(config.proEmails.join("\n"));
-    setPlanName(config.proPlan.name);
-    setPlanAmount(String(config.proPlan.amount));
-    setPlanCurrency(config.proPlan.currency);
-    setPlanInterval(config.proPlan.interval);
+    setCatCurrency(config.plans.currency);
+    setProMo(String(config.plans.pro.monthlyAmount));
+    setProYr(String(config.plans.pro.annualAmount));
+    setBizMo(String(config.plans.business.monthlyAmount));
+    setBizYr(String(config.plans.business.annualAmount));
+    setCapFree(String(config.limits.maxPlayers.free));
+    setCapPro(String(config.limits.maxPlayers.pro));
+    setCapBiz(String(config.limits.maxPlayers.business));
+    setAiFree(String(config.limits.aiMonthlyQuota.free));
+    setAiPro(String(config.limits.aiMonthlyQuota.pro));
+    setAiBiz(String(config.limits.aiMonthlyQuota.business));
+    setTrialDays(String(config.trialDays));
   }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = async () => {
@@ -65,11 +81,29 @@ export default function AdminPage() {
         defaultCoverImageUrl: coverUrl.trim() || null,
         proEmails: emails,
         proPlan: {
-          name: planName.trim() || "Pro",
-          amount: Math.max(0, Number(planAmount) || 0),
-          currency: (planCurrency.trim() || "NGN").toUpperCase(),
-          interval: planInterval,
+          name: "Pro",
+          amount: Math.max(0, Number(proMo) || 0),
+          currency: (catCurrency.trim() || "NGN").toUpperCase(),
+          interval: "monthly",
         },
+        plans: {
+          currency: (catCurrency.trim() || "NGN").toUpperCase(),
+          pro: { monthlyAmount: Math.max(0, Number(proMo) || 0), annualAmount: Math.max(0, Number(proYr) || 0) },
+          business: { monthlyAmount: Math.max(0, Number(bizMo) || 0), annualAmount: Math.max(0, Number(bizYr) || 0) },
+        },
+        limits: {
+          maxPlayers: {
+            free: Math.max(1, Number(capFree) || 1),
+            pro: Math.max(1, Number(capPro) || 1),
+            business: Math.max(1, Number(capBiz) || 1),
+          },
+          aiMonthlyQuota: {
+            free: Number(aiFree) || 0,
+            pro: Number(aiPro) || 0,
+            business: Number(aiBiz), // -1 = unlimited
+          },
+        },
+        trialDays: Math.max(0, Number(trialDays) || 0),
       });
       showSuccess("Settings saved", "Applies to new games across the app");
     } catch {
@@ -222,53 +256,72 @@ export default function AdminPage() {
               <p className="text-[11px] text-muted-foreground mt-2">Click Save to apply.</p>
             </Card>
 
-            {/* Pro plan pricing (Flutterwave) */}
+            {/* Plans, tiers & limits */}
             <Card className="p-6 rounded-2xl border-2">
-              <h2 className="font-bold text-lg mb-1">Pro plan pricing</h2>
+              <h2 className="font-bold text-lg mb-1">Plans, tiers &amp; limits</h2>
               <p className="text-sm text-muted-foreground mb-4">
-                What hosts pay to unlock Pro, charged via Flutterwave.
+                Prices (charged via Flutterwave), player caps and AI quotas per tier. AI quota −1 = unlimited.
               </p>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2">
-                  <label className="text-sm font-medium mb-1.5 block">Plan name</label>
-                  <Input value={planName} onChange={(e) => setPlanName(e.target.value)} className="rounded-xl" />
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-1.5 block">Amount</label>
-                  <Input
-                    type="number"
-                    inputMode="numeric"
-                    value={planAmount}
-                    onChange={(e) => setPlanAmount(e.target.value)}
-                    className="rounded-xl"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-1.5 block">Currency</label>
-                  <Input
-                    value={planCurrency}
-                    onChange={(e) => setPlanCurrency(e.target.value.toUpperCase())}
-                    maxLength={3}
-                    placeholder="NGN"
-                    className="rounded-xl uppercase"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="text-sm font-medium mb-1.5 block">Billing interval</label>
-                  <div className="inline-flex rounded-xl border border-border overflow-hidden">
-                    {(["monthly", "annual"] as const).map((iv) => (
-                      <button
-                        key={iv}
-                        onClick={() => setPlanInterval(iv)}
-                        className={`px-5 py-2 text-sm font-semibold capitalize transition-colors ${
-                          planInterval === iv ? "gradient-primary text-white" : "bg-card text-muted-foreground hover:bg-muted"
-                        }`}
-                      >
-                        {iv}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+
+              <div className="mb-4">
+                <label className="text-sm font-medium mb-1.5 block">Currency</label>
+                <Input
+                  value={catCurrency}
+                  onChange={(e) => setCatCurrency(e.target.value.toUpperCase())}
+                  maxLength={3}
+                  placeholder="NGN"
+                  className="rounded-xl uppercase w-32"
+                />
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border-separate border-spacing-y-1">
+                  <thead>
+                    <tr className="text-left text-muted-foreground">
+                      <th className="font-medium pb-1"></th>
+                      <th className="font-medium pb-1">Free</th>
+                      <th className="font-medium pb-1">Pro</th>
+                      <th className="font-medium pb-1">Business</th>
+                    </tr>
+                  </thead>
+                  <tbody className="[&_input]:rounded-lg [&_input]:h-9">
+                    <tr>
+                      <td className="pr-3 font-medium">Price / mo</td>
+                      <td className="pr-2 text-muted-foreground">—</td>
+                      <td className="pr-2"><Input type="number" value={proMo} onChange={(e) => setProMo(e.target.value)} /></td>
+                      <td><Input type="number" value={bizMo} onChange={(e) => setBizMo(e.target.value)} /></td>
+                    </tr>
+                    <tr>
+                      <td className="pr-3 font-medium">Price / yr</td>
+                      <td className="pr-2 text-muted-foreground">—</td>
+                      <td className="pr-2"><Input type="number" value={proYr} onChange={(e) => setProYr(e.target.value)} /></td>
+                      <td><Input type="number" value={bizYr} onChange={(e) => setBizYr(e.target.value)} /></td>
+                    </tr>
+                    <tr>
+                      <td className="pr-3 font-medium">Players / game</td>
+                      <td className="pr-2"><Input type="number" value={capFree} onChange={(e) => setCapFree(e.target.value)} /></td>
+                      <td className="pr-2"><Input type="number" value={capPro} onChange={(e) => setCapPro(e.target.value)} /></td>
+                      <td><Input type="number" value={capBiz} onChange={(e) => setCapBiz(e.target.value)} /></td>
+                    </tr>
+                    <tr>
+                      <td className="pr-3 font-medium">AI / month</td>
+                      <td className="pr-2"><Input type="number" value={aiFree} onChange={(e) => setAiFree(e.target.value)} /></td>
+                      <td className="pr-2"><Input type="number" value={aiPro} onChange={(e) => setAiPro(e.target.value)} /></td>
+                      <td><Input type="number" value={aiBiz} onChange={(e) => setAiBiz(e.target.value)} /></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mt-4 flex items-center gap-3">
+                <label className="text-sm font-medium">Free trial (days)</label>
+                <Input
+                  type="number"
+                  value={trialDays}
+                  onChange={(e) => setTrialDays(e.target.value)}
+                  className="rounded-lg h-9 w-24"
+                />
+                <span className="text-xs text-muted-foreground">0 = no trial</span>
               </div>
             </Card>
 

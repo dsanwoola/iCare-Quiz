@@ -67,32 +67,50 @@ async function verifyCaller(req) {
   }
 }
 
-async function getProPlan() {
+const normTier = (t) => (t === "business" ? "business" : "pro");
+const normInterval = (i) => (i === "annual" ? "annual" : "monthly");
+
+// Read the plan catalog + trial length from config/app, with safe fallbacks.
+async function getBillingConfig() {
   const snap = await db.doc("config/app").get();
-  const p = (snap.exists ? snap.data().proPlan : null) || {};
+  const c = snap.exists ? snap.data() : {};
+  const plans = c.plans || {};
+  const pro = plans.pro || {};
+  const business = plans.business || {};
+  const n = (v, f) => (Number(v) > 0 ? Number(v) : f);
   return {
-    name: typeof p.name === "string" && p.name ? p.name : "Pro",
-    amount: Number(p.amount) > 0 ? Number(p.amount) : 5000,
-    currency: typeof p.currency === "string" && p.currency ? p.currency : "NGN",
-    interval: p.interval === "annual" ? "annual" : "monthly",
+    currency: typeof plans.currency === "string" && plans.currency ? plans.currency : "NGN",
+    amounts: {
+      pro: { monthly: n(pro.monthlyAmount, 5000), annual: n(pro.annualAmount, 50000) },
+      business: { monthly: n(business.monthlyAmount, 20000), annual: n(business.annualAmount, 200000) },
+    },
+    trialDays: Number(c.trialDays) > 0 ? Number(c.trialDays) : 7,
   };
 }
 
-async function grantPro(uid, email, plan, txRef) {
-  const days = plan.interval === "annual" ? 365 : 30;
+// Grant/extend a tier: write the subscribers doc AND set a self-expiring
+// { tier, proUntil } custom claim (consumed by Firestore rules + the client).
+async function grantTier(uid, email, tier, days, { status = "active", txRef = null } = {}) {
+  const proUntil = Date.now() + days * 86400000;
   await db.doc(`subscribers/${uid}`).set(
     {
       uid,
       email: email || null,
-      plan: plan.name,
+      tier,
+      plan: tier === "business" ? "Business" : "Pro",
       provider: "flutterwave",
-      status: "active",
-      expiresAt: new Date(Date.now() + days * 86400000),
-      lastTxRef: txRef || null,
+      status,
+      expiresAt: new Date(proUntil),
+      lastTxRef: txRef,
       updatedAt: FieldValue.serverTimestamp(),
     },
     { merge: true }
   );
+  try {
+    await adminAuth.setCustomUserClaims(uid, { tier, proUntil });
+  } catch (e) {
+    console.error("setCustomUserClaims failed (client gating still applies):", e?.message);
+  }
 }
 
 async function flwVerify(transactionId) {
@@ -102,42 +120,47 @@ async function flwVerify(transactionId) {
   return r.json();
 }
 
-function paymentIsGood(verifyResp, plan) {
+// A payment is good if it succeeded and covered at least the expected price.
+function paymentIsGood(verifyResp, expectedAmount, currency) {
   const d = verifyResp?.data;
   return (
     verifyResp?.status === "success" &&
     d &&
     d.status === "successful" &&
-    Number(d.amount) >= plan.amount &&
-    d.currency === plan.currency
+    Number(d.amount) >= expectedAmount &&
+    d.currency === currency
   );
 }
 
 // ---- billing API ---------------------------------------------------------
 
-// Create a Flutterwave hosted-checkout link for the signed-in host.
+// Create a Flutterwave hosted-checkout link for the signed-in host's tier.
 app.post("/api/billing/checkout", async (req, res) => {
   if (!FLW_SECRET) return res.status(503).json({ error: "Billing is not configured yet." });
   const user = await verifyCaller(req);
   if (!user) return res.status(401).json({ error: "Please sign in." });
   try {
-    const plan = await getProPlan();
+    const tier = normTier(req.body?.tier);
+    const interval = normInterval(req.body?.interval);
+    const cfg = await getBillingConfig();
+    const amount = cfg.amounts[tier][interval];
     const txRef = `nqa-${user.uid}-${Date.now()}`;
     const origin = req.headers.origin || `https://${req.headers.host}`;
+    const label = tier === "business" ? "Business" : "Pro";
     const r = await fetch(`${FLW_BASE}/payments`, {
       method: "POST",
       headers: { Authorization: `Bearer ${FLW_SECRET}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         tx_ref: txRef,
-        amount: plan.amount,
-        currency: plan.currency,
+        amount,
+        currency: cfg.currency,
         redirect_url: `${origin}/billing/callback`,
         customer: { email: user.email, name: user.name || user.email },
         customizations: {
-          title: "Neighbours Quiz Arena Pro",
-          description: `${plan.name} subscription (${plan.interval})`,
+          title: `Neighbours Quiz Arena ${label}`,
+          description: `${label} subscription (${interval})`,
         },
-        meta: { uid: user.uid, plan: plan.name },
+        meta: { uid: user.uid, tier, interval },
       }),
     });
     const j = await r.json();
@@ -148,7 +171,27 @@ app.post("/api/billing/checkout", async (req, res) => {
   }
 });
 
-// Verify a transaction after redirect and grant Pro if it's this user's.
+// One-time free trial: grants Pro for config.trialDays, guarded by trialedAt.
+// Does NOT require Flutterwave (trials are free), so it works before secrets.
+app.post("/api/billing/trial", async (req, res) => {
+  const user = await verifyCaller(req);
+  if (!user) return res.status(401).json({ error: "Please sign in." });
+  try {
+    const ref = db.doc(`subscribers/${user.uid}`);
+    const snap = await ref.get();
+    if (snap.exists && snap.data().trialedAt) {
+      return res.status(409).json({ error: "You've already used your free trial." });
+    }
+    const cfg = await getBillingConfig();
+    await grantTier(user.uid, user.email, "pro", cfg.trialDays, { status: "trialing" });
+    await ref.set({ trialedAt: FieldValue.serverTimestamp() }, { merge: true });
+    return res.json({ ok: true, days: cfg.trialDays });
+  } catch (e) {
+    return res.status(500).json({ error: "Could not start your trial." });
+  }
+});
+
+// Verify a transaction after redirect and grant the tier if it's this user's.
 app.get("/api/billing/verify", async (req, res) => {
   if (!FLW_SECRET) return res.status(503).json({ error: "Billing is not configured yet." });
   const user = await verifyCaller(req);
@@ -157,11 +200,16 @@ app.get("/api/billing/verify", async (req, res) => {
   if (!transactionId) return res.json({ status: "failed" });
   try {
     const v = await flwVerify(transactionId);
-    const plan = await getProPlan();
     const d = v?.data;
-    const uid = d?.meta?.uid || (typeof d?.tx_ref === "string" && d.tx_ref.startsWith(`nqa-${user.uid}-`) ? user.uid : null);
-    if (paymentIsGood(v, plan) && uid === user.uid) {
-      await grantPro(user.uid, user.email, plan, d.tx_ref);
+    const meta = d?.meta || {};
+    const uid =
+      meta.uid || (typeof d?.tx_ref === "string" && d.tx_ref.startsWith(`nqa-${user.uid}-`) ? user.uid : null);
+    if (uid !== user.uid) return res.json({ status: "failed" });
+    const tier = normTier(meta.tier);
+    const interval = normInterval(meta.interval);
+    const cfg = await getBillingConfig();
+    if (paymentIsGood(v, cfg.amounts[tier][interval], cfg.currency)) {
+      await grantTier(user.uid, user.email, tier, interval === "annual" ? 365 : 30, { txRef: d.tx_ref });
       return res.json({ status: "success" });
     }
     return res.json({ status: "failed" });
@@ -179,10 +227,13 @@ app.post("/api/webhook/flutterwave", async (req, res) => {
   try {
     if (d?.status === "successful" && d.id) {
       const v = await flwVerify(d.id);
-      const plan = await getProPlan();
-      const uid = v?.data?.meta?.uid;
-      if (paymentIsGood(v, plan) && uid) {
-        await grantPro(uid, v.data.customer?.email, plan, v.data.tx_ref);
+      const meta = v?.data?.meta || {};
+      const uid = meta.uid;
+      const tier = normTier(meta.tier);
+      const interval = normInterval(meta.interval);
+      const cfg = await getBillingConfig();
+      if (uid && paymentIsGood(v, cfg.amounts[tier][interval], cfg.currency)) {
+        await grantTier(uid, v.data.customer?.email, tier, interval === "annual" ? 365 : 30, { txRef: v.data.tx_ref });
       }
     }
   } catch (e) {

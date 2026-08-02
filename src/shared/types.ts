@@ -138,6 +138,10 @@ export interface SessionInfo {
   coverImageUrl: string | null;
   /** Pro: epoch millis at which the game auto-starts, or null for manual start. */
   scheduledStartAt: number | null;
+  /** Max players allowed to join, stamped from the host's tier. */
+  maxPlayers: number;
+  /** Business white-label: brand shown to players in place of the app name. */
+  brandName: string | null;
   createdAt: string;
 }
 
@@ -180,6 +184,39 @@ export const DEFAULT_PRO_PLAN: ProPlan = {
   interval: "monthly",
 };
 
+/** Subscription tiers, lowest → highest access. */
+export type Tier = "free" | "pro" | "business";
+export const PAID_TIERS: Exclude<Tier, "free">[] = ["pro", "business"];
+export const TIER_LABELS: Record<Tier, string> = { free: "Free", pro: "Pro", business: "Business" };
+const TIER_RANK: Record<Tier, number> = { free: 0, pro: 1, business: 2 };
+
+/** True when `tier` grants at least the access of `min`. */
+export function tierAtLeast(tier: Tier, min: Tier): boolean {
+  return TIER_RANK[tier] >= TIER_RANK[min];
+}
+
+/** Unlimited sentinel for AI quota. */
+export const AI_UNLIMITED = -1;
+
+/** Monthly + annual price for a paid tier (minor unit of `currency`). */
+export interface PlanPrice {
+  monthlyAmount: number;
+  annualAmount: number;
+}
+
+/** Admin-priced catalog of paid tiers (Firestore: config/app.plans). */
+export interface PlanCatalog {
+  currency: string; // shared across tiers, e.g. NGN
+  pro: PlanPrice;
+  business: PlanPrice;
+}
+
+/** Per-tier limits an admin controls. */
+export interface TierLimits {
+  maxPlayers: Record<Tier, number>;
+  aiMonthlyQuota: Record<Tier, number>; // AI_UNLIMITED (-1) = unlimited
+}
+
 /** App-wide settings an admin controls (Firestore: config/app). */
 export interface AppConfig {
   defaultGameMode: GameMode;
@@ -189,7 +226,10 @@ export interface AppConfig {
   /** App-wide fallback lobby cover image, shown when a host hasn't set one. */
   defaultCoverImageUrl: string | null;
   proEmails: string[];
-  proPlan: ProPlan;
+  proPlan: ProPlan; // retained for back-compat (Pro monthly headline)
+  plans: PlanCatalog;
+  limits: TierLimits;
+  trialDays: number;
 }
 
 export const DEFAULT_APP_CONFIG: AppConfig = {
@@ -200,12 +240,23 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   defaultCoverImageUrl: null,
   proEmails: [],
   proPlan: DEFAULT_PRO_PLAN,
+  plans: {
+    currency: "NGN",
+    pro: { monthlyAmount: 5000, annualAmount: 50000 },
+    business: { monthlyAmount: 20000, annualAmount: 200000 },
+  },
+  limits: {
+    maxPlayers: { free: 10, pro: 300, business: 2000 },
+    aiMonthlyQuota: { free: 3, pro: 50, business: AI_UNLIMITED },
+  },
+  trialDays: 7,
 };
 
 /** A user's paid subscription record (Firestore: subscribers/{uid}). */
 export interface Subscription {
-  status: "active" | "expired";
+  status: "active" | "trialing" | "expired";
   plan: string;
+  tier: Tier;
   expiresAt: string | null;
 }
 

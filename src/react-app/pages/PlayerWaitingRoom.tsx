@@ -24,6 +24,7 @@ export default function PlayerWaitingRoom() {
   const [myTeamId, setMyTeamId] = useState<string | null>(null);
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
   const [scheduledStartAt, setScheduledStartAt] = useState<number | null>(null);
+  const [brandName, setBrandName] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const hasAlertedRef = useRef(false);
 
@@ -89,6 +90,7 @@ export default function PlayerWaitingRoom() {
       setTeams(session.teams);
       setCoverImageUrl(session.coverImageUrl);
       setScheduledStartAt(session.scheduledStartAt);
+      setBrandName(session.brandName);
 
       // If game has started, navigate to game screen
       if (session.status === "LIVE") {
@@ -187,7 +189,7 @@ export default function PlayerWaitingRoom() {
           <div className="gradient-secondary p-2 sm:p-3 rounded-xl sm:rounded-2xl shadow-lg shadow-secondary/30">
             <Zap className="w-5 h-5 sm:w-7 sm:h-7 text-neutral-900" />
           </div>
-          <span className="text-xl sm:text-2xl font-bold">Neighbours Quiz Arena</span>
+          <span className="text-xl sm:text-2xl font-bold">{brandName || "Neighbours Quiz Arena"}</span>
         </div>
 
         {/* Player badge */}

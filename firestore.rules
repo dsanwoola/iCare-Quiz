@@ -107,6 +107,28 @@ service cloud.firestore {
         request.auth.token.email.lower() == 'dsanwoola@gmail.com';
     }
 
+    // A paid tier is active when the self-expiring { tier, proUntil } custom
+    // claim (set by the billing server) is present and not yet expired.
+    function proActive() {
+      return isAuthed() &&
+        (request.auth.token.tier == 'pro' || request.auth.token.tier == 'business') &&
+        request.auth.token.proUntil > request.time.toMillis();
+    }
+
+    // True when this session update is INTRODUCING a Pro-only field (null ->
+    // premium value). Editing an already-premium value isn't re-checked (only a
+    // Pro writer could have set it in the first place).
+    function settingPremiumSessionField() {
+      return (request.resource.data.get('coverImageUrl', null) != null &&
+              resource.data.get('coverImageUrl', null) == null) ||
+             (request.resource.data.get('scheduledStartAt', null) != null &&
+              resource.data.get('scheduledStartAt', null) == null) ||
+             (request.resource.data.get('ad', null) != null &&
+              resource.data.get('ad', null) == null) ||
+             (request.resource.data.get('gameMode', null) == 'auto' &&
+              resource.data.get('gameMode', null) != 'auto');
+    }
+
     // ---------- App config (admin-controlled; publicly readable) ----------
     // Holds app-wide defaults (game mode, countdown, ad, pro list). Read by
     // every client; only an admin may write.
@@ -121,6 +143,12 @@ service cloud.firestore {
     match /subscribers/{uid} {
       allow read: if isOwner(uid) || isAdmin();
       allow write: if false;
+    }
+
+    // ---------- Per-user usage counters (soft AI quota) ----------
+    // A user maintains their own monthly generation count. Soft-gate only.
+    match /usage/{uid} {
+      allow read, write: if isOwner(uid);
     }
 
     // ---------- Public template library ----------
@@ -160,7 +188,8 @@ service cloud.firestore {
       allow update: if isOwner(resource.data.hostUid) &&
                        request.resource.data.status in ['WAITING','LIVE','ENDED'] &&
                        request.resource.data.questionStatus in ['CLOSED','OPEN','REVEAL'] &&
-                       notChanging(['hostUid','quizId','gamePin','createdAt']);
+                       notChanging(['hostUid','quizId','gamePin','createdAt']) &&
+                       (isAdmin() || proActive() || !settingPremiumSessionField());
       allow delete: if isOwner(resource.data.hostUid);
 
       // ---------- Participants ----------
