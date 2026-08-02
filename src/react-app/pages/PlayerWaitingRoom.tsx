@@ -21,9 +21,23 @@ export default function PlayerWaitingRoom() {
   const [teamMode, setTeamMode] = useState(false);
   const [teams, setTeams] = useState<Team[]>([]);
   const [myTeamId, setMyTeamId] = useState<string | null>(null);
+  const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
+  const [scheduledStartAt, setScheduledStartAt] = useState<number | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const hasAlertedRef = useRef(false);
 
   const myTeam = teamMode ? teams.find((t) => t.id === myTeamId) ?? null : null;
+  const remainingMs = scheduledStartAt ? Math.max(0, scheduledStartAt - nowMs) : null;
+
+  const formatCountdown = (ms: number) => {
+    const total = Math.max(0, Math.ceil(ms / 1000));
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    const mm = String(m).padStart(2, "0");
+    const ss = String(s).padStart(2, "0");
+    return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`;
+  };
 
   const tips = [
     "Answer quickly for bonus points!",
@@ -39,6 +53,14 @@ export default function PlayerWaitingRoom() {
     }, 3000);
     return () => clearInterval(interval);
   }, []);
+
+  // Keep the "starts in" countdown live when the host has scheduled a start.
+  useEffect(() => {
+    if (!scheduledStartAt) return;
+    const iv = setInterval(() => setNowMs(Date.now()), 1000);
+    setNowMs(Date.now());
+    return () => clearInterval(iv);
+  }, [scheduledStartAt]);
 
   useEffect(() => {
     // Redirect to join if no session info
@@ -61,6 +83,8 @@ export default function PlayerWaitingRoom() {
       setIsConnected(true);
       setTeamMode(session.teamMode);
       setTeams(session.teams);
+      setCoverImageUrl(session.coverImageUrl);
+      setScheduledStartAt(session.scheduledStartAt);
 
       // If game has started, navigate to game screen
       if (session.status === "LIVE") {
@@ -86,6 +110,40 @@ export default function PlayerWaitingRoom() {
       unsubPlayers();
     };
   }, [sessionId, participantId, gamePin, navigate]);
+
+  // Full-screen cover takeover: the host's lobby image dominates the screen
+  // until the game starts, with a countdown / waiting bar along the bottom.
+  if (coverImageUrl) {
+    return (
+      <div className="fixed inset-0 bg-black safe-area-inset">
+        <img src={coverImageUrl} alt="" className="absolute inset-0 w-full h-full object-contain" />
+
+        <div className="absolute top-4 right-4 safe-area-top">
+          <div
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium backdrop-blur-sm ${
+              isConnected ? "bg-green-500/20 text-green-300" : "bg-destructive/20 text-destructive"
+            }`}
+          >
+            {isConnected ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5 animate-pulse" />}
+          </div>
+        </div>
+
+        <div className="absolute inset-x-0 bottom-0 p-5 pb-8 bg-gradient-to-t from-black/80 via-black/40 to-transparent text-center text-white safe-area-bottom">
+          {remainingMs !== null ? (
+            <>
+              <p className="text-xs uppercase tracking-[0.2em] text-white/70 mb-1">Starts in</p>
+              <div className="text-4xl font-black tabular-nums mb-1">{formatCountdown(remainingMs)}</div>
+            </>
+          ) : (
+            <h2 className="text-xl font-bold mb-1">Get ready!</h2>
+          )}
+          <p className="text-sm text-white/70">
+            Waiting for the host to start · {playerCount} player{playerCount !== 1 ? "s" : ""} in
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[100dvh] flex flex-col items-center justify-center px-4 py-8 relative overflow-hidden safe-area-inset">
@@ -175,9 +233,18 @@ export default function PlayerWaitingRoom() {
           )}
 
           <h2 className="text-xl sm:text-2xl font-bold mb-2 sm:mb-3 text-green-800">Get Ready!</h2>
-          <p className="text-sm sm:text-base text-muted-foreground mb-4 sm:mb-6">
-            Waiting for the host to start...
-          </p>
+          {remainingMs !== null ? (
+            <div className="mb-4 sm:mb-6">
+              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-1">Starts in</p>
+              <div className="text-4xl sm:text-5xl font-black tabular-nums text-primary">
+                {formatCountdown(remainingMs)}
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm sm:text-base text-muted-foreground mb-4 sm:mb-6">
+              Waiting for the host to start...
+            </p>
+          )}
 
           {/* Rotating tips */}
           <div className="h-6 sm:h-8 relative overflow-hidden">

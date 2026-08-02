@@ -134,6 +134,10 @@ export interface SessionInfo {
   getReadySeconds: number;
   gameMode: GameMode;
   ad: CountdownAd | null;
+  /** Pro: full-screen lobby cover image shown before the game starts. */
+  coverImageUrl: string | null;
+  /** Pro: epoch millis at which the game auto-starts, or null for manual start. */
+  scheduledStartAt: number | null;
   createdAt: string;
 }
 

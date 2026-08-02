@@ -298,6 +298,8 @@ function sessionInfoFromDoc(id: string, data: DocumentData): SessionInfo {
     getReadySeconds: data.getReadySeconds ?? 10,
     gameMode: data.gameMode === "auto" ? "auto" : "manual",
     ad: (data.ad as CountdownAd) ?? null,
+    coverImageUrl: data.coverImageUrl ?? null,
+    scheduledStartAt: typeof data.scheduledStartAt === "number" ? data.scheduledStartAt : null,
     createdAt: tsToIso(data.createdAt),
   };
 }
@@ -363,6 +365,8 @@ export async function createSession(quizId: string): Promise<SessionInfo> {
     getReadySeconds: config.defaultCountdownSeconds ?? 10,
     gameMode: "manual",
     ad: null,
+    coverImageUrl: null,
+    scheduledStartAt: null,
     countdownStartedAt: null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -531,6 +535,24 @@ export async function setGameMode(sessionId: string, mode: GameMode): Promise<vo
 export async function setSessionAd(sessionId: string, ad: CountdownAd | null): Promise<void> {
   await updateDoc(doc(db, "sessions", sessionId), {
     ad: ad,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/** Pro: set (or clear) the full-screen lobby cover image shown before start. */
+export async function setSessionCover(sessionId: string, coverImageUrl: string | null): Promise<void> {
+  await updateDoc(doc(db, "sessions", sessionId), {
+    coverImageUrl: coverImageUrl,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/** Pro: schedule an automatic game start (epoch millis), or null for manual.
+ *  Stored as an absolute time so a future server scheduler can flip the game
+ *  with no data change; today the host's open lobby fires the start. */
+export async function setScheduledStart(sessionId: string, startAtMs: number | null): Promise<void> {
+  await updateDoc(doc(db, "sessions", sessionId), {
+    scheduledStartAt: startAtMs,
     updatedAt: serverTimestamp(),
   });
 }

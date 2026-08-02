@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, type ChangeEvent } from "react";
 import { Link, useSearchParams, useNavigate, useParams } from "react-router";
 import { Button } from "@/react-app/components/ui/button";
 import { Card } from "@/react-app/components/ui/card";
@@ -17,7 +17,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import { Users2, Timer, Zap, Hand, Megaphone, Sparkle, MessageCircle, Send, Link2 } from "lucide-react";
+import { Users2, Timer, Zap, Hand, Megaphone, Sparkle, MessageCircle, Send, Link2, ImagePlus, CalendarClock, Trash2 } from "lucide-react";
 import type { SessionInfo, ParticipantInfo, Question, GameMode } from "@/shared/types";
 import { PRESET_TEAMS, GET_READY_OPTIONS } from "@/shared/types";
 import {
@@ -31,6 +31,9 @@ import {
   setGetReadySeconds,
   setGameMode,
   setSessionAd,
+  setSessionCover,
+  setScheduledStart,
+  uploadLogo,
   startGame as startGameApi,
 } from "@/react-app/lib/data";
 import { useAppConfig } from "@/react-app/hooks/useAppConfig";
@@ -53,6 +56,11 @@ export default function HostWaitingRoom() {
   const [isStarting, setIsStarting] = useState(false);
   const [adText, setAdText] = useState("");
   const [adSaved, setAdSaved] = useState(false);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [scheduleInput, setScheduleInput] = useState("");
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const autoStartedRef = useRef(false);
   const { showError } = useToast();
   const { config, isProUser: pro } = useAppConfig();
 
@@ -77,6 +85,61 @@ export default function HostWaitingRoom() {
     setSession({ ...session, ad: text ? { text, imageUrl: null, url: null } : null });
     setAdSaved(true);
     setTimeout(() => setAdSaved(false), 1500);
+  };
+
+  // Pro: full-screen lobby cover image.
+  const pickCover = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !session) return;
+    setIsUploadingCover(true);
+    try {
+      const url = await uploadLogo(file);
+      await setSessionCover(session.id, url);
+      setSession({ ...session, coverImageUrl: url });
+    } catch {
+      showError("Couldn't upload image", "Please try a different file");
+    } finally {
+      setIsUploadingCover(false);
+      if (coverInputRef.current) coverInputRef.current.value = "";
+    }
+  };
+
+  const removeCover = async () => {
+    if (!session) return;
+    await setSessionCover(session.id, null);
+    setSession({ ...session, coverImageUrl: null });
+  };
+
+  // Pro: schedule an automatic start (epoch millis) or clear it.
+  const applySchedule = async (startAtMs: number | null) => {
+    if (!session) return;
+    autoStartedRef.current = false;
+    await setScheduledStart(session.id, startAtMs);
+    setSession({ ...session, scheduledStartAt: startAtMs });
+    if (startAtMs === null) setScheduleInput("");
+  };
+
+  const scheduleInMinutes = (minutes: number) => applySchedule(Date.now() + minutes * 60000);
+
+  const scheduleAtInput = () => {
+    if (!scheduleInput) return;
+    const at = new Date(scheduleInput).getTime();
+    if (!Number.isFinite(at)) return;
+    if (at <= Date.now()) {
+      showError("Pick a future time", "The start time must be later than now.");
+      return;
+    }
+    applySchedule(at);
+  };
+
+  const formatCountdown = (ms: number) => {
+    const total = Math.max(0, Math.ceil(ms / 1000));
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    const mm = String(m).padStart(2, "0");
+    const ss = String(s).padStart(2, "0");
+    return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`;
   };
 
   const toggleTeamMode = async () => {
@@ -211,6 +274,29 @@ export default function HostWaitingRoom() {
       setIsStarting(false);
     }
   };
+
+  // Tick every second while a start is scheduled, so the countdown stays live.
+  const startAtMs = session?.status === "WAITING" ? session?.scheduledStartAt ?? null : null;
+  useEffect(() => {
+    if (!startAtMs) return;
+    const iv = setInterval(() => setNowMs(Date.now()), 1000);
+    setNowMs(Date.now());
+    return () => clearInterval(iv);
+  }, [startAtMs]);
+
+  // Host-screen auto-start: fire once when the scheduled time is reached. Also
+  // catches up if the host opens the lobby after the time already passed. The
+  // start path is idempotent (guarded by autoStartedRef + WAITING status), so a
+  // future server scheduler can drop in without conflicting.
+  useEffect(() => {
+    if (!startAtMs || questions.length === 0) return;
+    if (autoStartedRef.current) return;
+    if (nowMs >= startAtMs) {
+      autoStartedRef.current = true;
+      startGame();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nowMs, startAtMs, questions.length]);
 
   if (isLoading) {
     return (
@@ -414,6 +500,117 @@ export default function HostWaitingRoom() {
             <p className="mt-2 text-center text-xs text-muted-foreground">
               ⚡ The game runs itself — questions open, close, reveal and advance automatically.
             </p>
+          )}
+
+          {/* Full-screen lobby cover image (Pro) */}
+          {session && (
+            <div className="mt-5 max-w-md mx-auto">
+              <label className="flex items-center gap-1.5 text-sm font-medium mb-1.5 justify-center">
+                <ImagePlus className="w-4 h-4 text-primary" />
+                Lobby cover image
+                {!pro && (
+                  <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-yellow-600">
+                    <Sparkle className="w-3 h-3" /> PRO
+                  </span>
+                )}
+              </label>
+              {session.coverImageUrl ? (
+                <div className="relative rounded-xl overflow-hidden border border-border">
+                  <img src={session.coverImageUrl} alt="Lobby cover" className="w-full h-40 object-cover" />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={removeCover}
+                    className="absolute top-2 right-2 h-8 rounded-lg bg-card/90"
+                  >
+                    <Trash2 className="w-4 h-4 mr-1" /> Remove
+                  </Button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled={!pro || isUploadingCover}
+                  onClick={() => coverInputRef.current?.click()}
+                  className="w-full h-24 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 text-sm text-muted-foreground hover:border-primary disabled:opacity-60"
+                >
+                  {isUploadingCover ? <Loader2 className="w-5 h-5 animate-spin" /> : <ImagePlus className="w-5 h-5" />}
+                  {pro ? (isUploadingCover ? "Uploading…" : "Upload a full-screen cover") : "Upgrade to Pro for a lobby cover"}
+                </button>
+              )}
+              <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={pickCover} />
+              <p className="text-[11px] text-muted-foreground text-center mt-1.5">
+                Shown full-screen on players’ phones while they wait. Disappears when the game starts.
+              </p>
+            </div>
+          )}
+
+          {/* Scheduled auto-start + live countdown (Pro) */}
+          {session && (
+            <div className="mt-5 max-w-md mx-auto">
+              <label className="flex items-center gap-1.5 text-sm font-medium mb-1.5 justify-center">
+                <CalendarClock className="w-4 h-4 text-primary" />
+                Scheduled start
+                {!pro && (
+                  <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-yellow-600">
+                    <Sparkle className="w-3 h-3" /> PRO
+                  </span>
+                )}
+              </label>
+              {startAtMs ? (
+                <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-center">
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Auto-starts in</p>
+                  <div className="text-3xl font-black tabular-nums text-primary my-1">
+                    {formatCountdown(startAtMs - nowMs)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    at {new Date(startAtMs).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · keep this
+                    screen open
+                  </p>
+                  <Button variant="outline" size="sm" onClick={() => applySchedule(null)} className="mt-2 rounded-lg">
+                    Cancel schedule
+                  </Button>
+                </div>
+              ) : (
+                <div className={pro ? "" : "opacity-60"}>
+                  <div className="flex gap-2 justify-center flex-wrap mb-2">
+                    {[5, 15, 30].map((mins) => (
+                      <Button
+                        key={mins}
+                        variant="outline"
+                        size="sm"
+                        disabled={!pro}
+                        onClick={() => scheduleInMinutes(mins)}
+                        className="rounded-lg"
+                      >
+                        In {mins} min
+                      </Button>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="datetime-local"
+                      value={scheduleInput}
+                      disabled={!pro}
+                      onChange={(e) => setScheduleInput(e.target.value)}
+                      className="flex-1 h-10 rounded-xl border border-border bg-card px-3 text-sm focus:outline-none focus:border-primary disabled:opacity-60"
+                    />
+                    <Button
+                      variant="outline"
+                      className="rounded-xl h-10"
+                      disabled={!pro || !scheduleInput}
+                      onClick={scheduleAtInput}
+                    >
+                      Set
+                    </Button>
+                  </div>
+                </div>
+              )}
+              <p className="text-[11px] text-muted-foreground text-center mt-1.5">
+                {pro
+                  ? "The game starts automatically at this time — keep this screen open. You can still Start now anytime."
+                  : "Upgrade to Pro to auto-start your game at a set time."}
+              </p>
+            </div>
           )}
 
           {/* Sponsor slot for the get-ready screen (Pro) */}
