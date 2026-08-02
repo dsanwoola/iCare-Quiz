@@ -78,7 +78,7 @@ Requirements:
         prompt: (q.prompt || "").slice(0, 500),
         options,
         correctAnswers: correct.length ? correct : options[0] ? [options[0].id] : [],
-        durationSeconds: 20,
+        durationSeconds: 10,
         basePoints: 1000,
       };
     })

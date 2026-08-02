@@ -45,7 +45,7 @@ export const QuestionInputSchema = z.object({
   correctAnswers: z.array(z.string()).min(1, "Provide at least one correct answer"),
   // Optional ± tolerance for NUMERIC questions.
   numericTolerance: z.number().min(0).optional(),
-  durationSeconds: z.number().min(5).max(300).default(20),
+  durationSeconds: z.number().min(5).max(300).default(10),
   basePoints: z.number().min(1).max(5000).default(1000),
 });
 export type QuestionInput = z.infer<typeof QuestionInputSchema>;

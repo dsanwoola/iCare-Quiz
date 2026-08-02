@@ -100,7 +100,7 @@ function parseQuizDocument(text: string): Array<{
         prompt,
         options,
         correctAnswers,
-        durationSeconds: 20,
+        durationSeconds: 10,
         basePoints: 1000,
       });
     }
@@ -121,7 +121,7 @@ function createEmptyQuestion(): Question {
       { id: crypto.randomUUID(), text: "" },
     ],
     correctAnswers: [],
-    durationSeconds: 20,
+    durationSeconds: 10,
     basePoints: 1000,
   };
 }
