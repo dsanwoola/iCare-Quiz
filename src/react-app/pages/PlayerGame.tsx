@@ -630,6 +630,9 @@ export default function PlayerGame() {
             </div>
             <h2 className="text-2xl sm:text-3xl font-black mb-2 sm:mb-3">Locked In!</h2>
             <p className="text-white/60 text-base sm:text-lg">Waiting for the reveal...</p>
+            <div className="mt-8 w-full">
+              <CountdownAdSlot sessionAd={sessionAd} defaultAd={config.defaultAd} dark />
+            </div>
           </div>
         )}
 
