@@ -202,6 +202,7 @@ function appConfigFrom(data: DocumentData | undefined): AppConfig {
     defaultCountdownSeconds: data?.defaultCountdownSeconds ?? DEFAULT_APP_CONFIG.defaultCountdownSeconds,
     countdownSoundEnabled: data?.countdownSoundEnabled ?? DEFAULT_APP_CONFIG.countdownSoundEnabled,
     defaultAd: (data?.defaultAd as CountdownAd) ?? null,
+    defaultCoverImageUrl: data?.defaultCoverImageUrl ?? null,
     proEmails: (data?.proEmails as string[]) ?? [],
     proPlan: {
       name: p.name ?? DEFAULT_APP_CONFIG.proPlan.name,

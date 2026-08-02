@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Link } from "react-router";
 import { Button } from "@/react-app/components/ui/button";
 import { Input } from "@/react-app/components/ui/input";
@@ -6,11 +6,11 @@ import { Textarea } from "@/react-app/components/ui/textarea";
 import { Card } from "@/react-app/components/ui/card";
 import { Switch } from "@/react-app/components/ui/switch";
 import { useToast } from "@/react-app/components/ui/toast";
-import { ArrowLeft, ShieldCheck, Loader2, Save, Zap, Hand, Megaphone } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Loader2, Save, Zap, Hand, Megaphone, ImagePlus, Trash2 } from "lucide-react";
 import type { GameMode } from "@/shared/types";
 import { GET_READY_OPTIONS } from "@/shared/types";
 import { useAppConfig } from "@/react-app/hooks/useAppConfig";
-import { updateAppConfig } from "@/react-app/lib/data";
+import { updateAppConfig, uploadLogo } from "@/react-app/lib/data";
 
 export default function AdminPage() {
   const { config, loading } = useAppConfig();
@@ -22,6 +22,9 @@ export default function AdminPage() {
   const [adText, setAdText] = useState("");
   const [adImage, setAdImage] = useState("");
   const [adUrl, setAdUrl] = useState("");
+  const [coverUrl, setCoverUrl] = useState("");
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const coverInputRef = useRef<HTMLInputElement>(null);
   const [proEmails, setProEmails] = useState("");
   const [planName, setPlanName] = useState("Pro");
   const [planAmount, setPlanAmount] = useState("5000");
@@ -37,6 +40,7 @@ export default function AdminPage() {
     setAdText(config.defaultAd?.text ?? "");
     setAdImage(config.defaultAd?.imageUrl ?? "");
     setAdUrl(config.defaultAd?.url ?? "");
+    setCoverUrl(config.defaultCoverImageUrl ?? "");
     setProEmails(config.proEmails.join("\n"));
     setPlanName(config.proPlan.name);
     setPlanAmount(String(config.proPlan.amount));
@@ -58,6 +62,7 @@ export default function AdminPage() {
         defaultAd: adText.trim()
           ? { text: adText.trim(), imageUrl: adImage.trim() || null, url: adUrl.trim() || null }
           : null,
+        defaultCoverImageUrl: coverUrl.trim() || null,
         proEmails: emails,
         proPlan: {
           name: planName.trim() || "Pro",
@@ -71,6 +76,20 @@ export default function AdminPage() {
       showError("Failed to save", "Please try again");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const pickCover = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingCover(true);
+    try {
+      setCoverUrl(await uploadLogo(file));
+    } catch {
+      showError("Couldn't upload image", "Please try a different file");
+    } finally {
+      setUploadingCover(false);
+      if (coverInputRef.current) coverInputRef.current.value = "";
     }
   };
 
@@ -164,6 +183,43 @@ export default function AdminPage() {
                 <Input placeholder="Image URL (optional)" value={adImage} onChange={(e) => setAdImage(e.target.value)} className="rounded-xl" />
                 <Input placeholder="Link URL (optional)" value={adUrl} onChange={(e) => setAdUrl(e.target.value)} className="rounded-xl" />
               </div>
+            </Card>
+
+            {/* Default lobby cover image */}
+            <Card className="p-6 rounded-2xl border-2">
+              <div className="flex items-center gap-2 mb-1">
+                <ImagePlus className="w-5 h-5 text-primary" />
+                <h2 className="font-bold text-lg">Default lobby cover</h2>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                Full-screen image shown on players' phones in the waiting lobby when a host hasn't uploaded their own
+                cover. Leave empty for no default.
+              </p>
+              {coverUrl ? (
+                <div className="relative rounded-xl overflow-hidden border">
+                  <img src={coverUrl} alt="Default cover" className="w-full h-44 object-cover" />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCoverUrl("")}
+                    className="absolute top-2 right-2 h-8 rounded-lg bg-card/90"
+                  >
+                    <Trash2 className="w-4 h-4 mr-1" /> Remove
+                  </Button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled={uploadingCover}
+                  onClick={() => coverInputRef.current?.click()}
+                  className="w-full h-28 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1 text-sm text-muted-foreground hover:border-primary disabled:opacity-60"
+                >
+                  {uploadingCover ? <Loader2 className="w-5 h-5 animate-spin" /> : <ImagePlus className="w-5 h-5" />}
+                  {uploadingCover ? "Uploading…" : "Upload a default cover"}
+                </button>
+              )}
+              <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={pickCover} />
+              <p className="text-[11px] text-muted-foreground mt-2">Click Save to apply.</p>
             </Card>
 
             {/* Pro plan pricing (Flutterwave) */}

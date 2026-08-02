@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router";
 import { Zap, Users, Wifi, WifiOff, Sparkles } from "lucide-react";
 import type { Team } from "@/shared/types";
 import { subscribeSession, subscribeParticipants, ensurePlayerAuth } from "@/react-app/lib/data";
+import { useAppConfig } from "@/react-app/hooks/useAppConfig";
 import { sounds, playSound, initAudio } from "@/react-app/lib/feedback";
 
 export default function PlayerWaitingRoom() {
@@ -26,8 +27,11 @@ export default function PlayerWaitingRoom() {
   const [nowMs, setNowMs] = useState(() => Date.now());
   const hasAlertedRef = useRef(false);
 
+  const { config } = useAppConfig();
   const myTeam = teamMode ? teams.find((t) => t.id === myTeamId) ?? null : null;
   const remainingMs = scheduledStartAt ? Math.max(0, scheduledStartAt - nowMs) : null;
+  // Host's own cover wins; otherwise fall back to the app-wide admin default.
+  const coverToShow = coverImageUrl ?? config.defaultCoverImageUrl ?? null;
 
   const formatCountdown = (ms: number) => {
     const total = Math.max(0, Math.ceil(ms / 1000));
@@ -113,10 +117,10 @@ export default function PlayerWaitingRoom() {
 
   // Full-screen cover takeover: the host's lobby image dominates the screen
   // until the game starts, with a countdown / waiting bar along the bottom.
-  if (coverImageUrl) {
+  if (coverToShow) {
     return (
       <div className="fixed inset-0 bg-black safe-area-inset">
-        <img src={coverImageUrl} alt="" className="absolute inset-0 w-full h-full object-contain" />
+        <img src={coverToShow} alt="" className="absolute inset-0 w-full h-full object-contain" />
 
         <div className="absolute top-4 right-4 safe-area-top">
           <div

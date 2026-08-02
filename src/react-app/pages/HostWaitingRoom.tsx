@@ -539,7 +539,9 @@ export default function HostWaitingRoom() {
               )}
               <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={pickCover} />
               <p className="text-[11px] text-muted-foreground text-center mt-1.5">
-                Shown full-screen on players’ phones while they wait. Disappears when the game starts.
+                {!session.coverImageUrl && config.defaultCoverImageUrl
+                  ? "An app-wide default cover is currently showing to players — upload to override it."
+                  : "Shown full-screen on players’ phones while they wait. Disappears when the game starts."}
               </p>
             </div>
           )}

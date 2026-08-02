@@ -186,6 +186,8 @@ export interface AppConfig {
   defaultCountdownSeconds: number;
   countdownSoundEnabled: boolean;
   defaultAd: CountdownAd | null;
+  /** App-wide fallback lobby cover image, shown when a host hasn't set one. */
+  defaultCoverImageUrl: string | null;
   proEmails: string[];
   proPlan: ProPlan;
 }
@@ -195,6 +197,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   defaultCountdownSeconds: 10,
   countdownSoundEnabled: true,
   defaultAd: null,
+  defaultCoverImageUrl: null,
   proEmails: [],
   proPlan: DEFAULT_PRO_PLAN,
 };
