@@ -4,6 +4,7 @@ import { Zap, Users, Wifi, WifiOff, Sparkles } from "lucide-react";
 import type { Team } from "@/shared/types";
 import { subscribeSession, subscribeParticipants, ensurePlayerAuth } from "@/react-app/lib/data";
 import { useAppConfig } from "@/react-app/hooks/useAppConfig";
+import { useWakeLock } from "@/react-app/hooks/useWakeLock";
 import { sounds, playSound, initAudio } from "@/react-app/lib/feedback";
 
 export default function PlayerWaitingRoom() {
@@ -29,6 +30,8 @@ export default function PlayerWaitingRoom() {
   const hasAlertedRef = useRef(false);
 
   const { config } = useAppConfig();
+  // Keep the screen awake while players wait on the lobby / cover screen.
+  useWakeLock();
   const myTeam = teamMode ? teams.find((t) => t.id === myTeamId) ?? null : null;
   const remainingMs = scheduledStartAt ? Math.max(0, scheduledStartAt - nowMs) : null;
   // Host's own cover wins; otherwise fall back to the app-wide admin default.
