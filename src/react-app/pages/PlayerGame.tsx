@@ -357,6 +357,7 @@ export default function PlayerGame() {
           currentRank: e.rank,
           isKicked: false,
           teamId: e.teamId,
+          lga: e.lga,
         })),
         teams
       )
@@ -866,6 +867,7 @@ export default function PlayerGame() {
                         <span className={`font-semibold truncate ${isMe ? "text-white" : "text-white/80"}`}>
                           {entry.nickname}
                           {isMe && <span className="text-primary ml-1">(You)</span>}
+                          {entry.lga && <span className="text-white/40 font-normal"> — {entry.lga}</span>}
                         </span>
                       </div>
                       <span className="font-bold tabular-nums shrink-0 ml-2">{entry.totalPoints.toLocaleString()}</span>

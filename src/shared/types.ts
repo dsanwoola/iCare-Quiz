@@ -142,6 +142,8 @@ export interface SessionInfo {
   maxPlayers: number;
   /** Business white-label: brand shown to players in place of the app name. */
   brandName: string | null;
+  /** When true, the join form collects each player's phone + State/LGA. */
+  collectPlayerInfo: boolean;
   createdAt: string;
 }
 
@@ -283,6 +285,17 @@ export interface ParticipantInfo {
   currentRank: number | null;
   isKicked: boolean;
   teamId: string | null;
+  lga: string | null;
+}
+
+/** Host-only collected contact for a player (phone kept private to the host). */
+export interface PlayerContact {
+  uid: string;
+  nickname: string;
+  phone: string;
+  state: string | null;
+  lga: string | null;
+  joinedAt: string | null;
 }
 
 export interface JoinResult {
@@ -335,6 +348,7 @@ export interface LeaderboardEntry {
   lastAnswerPoints: number | null;
   streak: number;
   teamId: string | null;
+  lga: string | null;
 }
 
 export interface AnswerResult {

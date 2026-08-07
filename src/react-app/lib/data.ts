@@ -46,6 +46,7 @@ import type {
   GameMode,
   Subscription,
   Tier,
+  PlayerContact,
 } from "@/shared/types";
 import { PRESET_TEAMS, DEFAULT_APP_CONFIG } from "@/shared/types";
 import { STARTER_TEMPLATES } from "@/react-app/data/templates";
@@ -361,6 +362,7 @@ function sessionInfoFromDoc(id: string, data: DocumentData): SessionInfo {
     maxPlayers:
       typeof data.maxPlayers === "number" ? data.maxPlayers : DEFAULT_APP_CONFIG.limits.maxPlayers.free,
     brandName: data.brandName ?? null,
+    collectPlayerInfo: !!data.collectPlayerInfo,
     createdAt: tsToIso(data.createdAt),
   };
 }
@@ -430,6 +432,7 @@ export async function createSession(quizId: string): Promise<SessionInfo> {
     scheduledStartAt: null,
     maxPlayers: config.limits.maxPlayers.free,
     brandName: null,
+    collectPlayerInfo: false,
     countdownStartedAt: null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -473,7 +476,11 @@ export async function getSessionByPin(pin: string): Promise<SessionInfo> {
 }
 
 /** Join a session as an anonymous player. */
-export async function joinSession(pin: string, nickname: string): Promise<JoinResult> {
+export async function joinSession(
+  pin: string,
+  nickname: string,
+  info?: { phone?: string; state?: string; lga?: string }
+): Promise<JoinResult> {
   const uid = await ensurePlayerAuth();
 
   const sessionsSnap = await getDocs(
@@ -525,8 +532,22 @@ export async function joinSession(pin: string, nickname: string): Promise<JoinRe
     teamId: team?.id ?? null,
     teamName: team?.name ?? null,
     teamColor: team?.color ?? null,
+    lga: info?.lga ?? null,
     joinedAt: serverTimestamp(),
   });
+
+  // When the host enabled data collection, record the phone (host-private) +
+  // location in a separate contacts doc players cannot read from each other.
+  if (session.collectPlayerInfo && info?.phone) {
+    await setDoc(doc(db, "sessions", sessionDoc.id, "contacts", uid), {
+      uid,
+      nickname,
+      phone: info.phone,
+      state: info.state ?? null,
+      lga: info.lga ?? null,
+      joinedAt: serverTimestamp(),
+    });
+  }
 
   return {
     participantId: uid,
@@ -554,6 +575,7 @@ function participantInfoFrom(
     currentRank: index + 1,
     isKicked: !!data.isKicked,
     teamId: data.teamId ?? null,
+    lga: data.lga ?? null,
   };
 }
 
@@ -641,6 +663,32 @@ export async function setSessionBrand(sessionId: string, brandName: string | nul
     brandName: brandName,
     updatedAt: serverTimestamp(),
   });
+}
+
+/** Toggle whether the join form collects each player's phone + State/LGA. */
+export async function setCollectPlayerInfo(sessionId: string, on: boolean): Promise<void> {
+  await updateDoc(doc(db, "sessions", sessionId), {
+    collectPlayerInfo: on,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/** Host-only: read the collected player contacts (phone + location). */
+export async function getSessionContacts(sessionId: string): Promise<PlayerContact[]> {
+  const snap = await getDocs(collection(db, "sessions", sessionId, "contacts"));
+  return snap.docs
+    .map((d) => {
+      const x = d.data();
+      return {
+        uid: x.uid ?? d.id,
+        nickname: x.nickname ?? "",
+        phone: x.phone ?? "",
+        state: x.state ?? null,
+        lga: x.lga ?? null,
+        joinedAt: x.joinedAt instanceof Timestamp ? x.joinedAt.toDate().toISOString() : null,
+      };
+    })
+    .sort((a, b) => (a.joinedAt ?? "").localeCompare(b.joinedAt ?? ""));
 }
 
 /** Soft per-host monthly AI-generation quota (usage/{uid}). quota < 0 = unlimited.
@@ -983,6 +1031,7 @@ function leaderboardFrom(docs: QueryDocumentSnapshot<DocumentData>[]): Leaderboa
       lastAnswerPoints: null,
       streak: d.data().streak ?? 0,
       teamId: d.data().teamId ?? null,
+      lga: d.data().lga ?? null,
     }));
 }
 

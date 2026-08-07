@@ -17,7 +17,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import { Users2, Timer, Zap, Hand, Megaphone, Sparkle, MessageCircle, Send, Link2, ImagePlus, CalendarClock, Trash2 } from "lucide-react";
+import { Users2, Timer, Zap, Hand, Megaphone, Sparkle, MessageCircle, Send, Link2, ImagePlus, CalendarClock, Trash2, ClipboardList, Download } from "lucide-react";
 import type { SessionInfo, ParticipantInfo, Question, GameMode } from "@/shared/types";
 import { PRESET_TEAMS, GET_READY_OPTIONS } from "@/shared/types";
 import {
@@ -35,6 +35,8 @@ import {
   setScheduledStart,
   setSessionMaxPlayers,
   setSessionBrand,
+  setCollectPlayerInfo,
+  getSessionContacts,
   uploadLogo,
   startGame as startGameApi,
 } from "@/react-app/lib/data";
@@ -100,6 +102,42 @@ export default function HostWaitingRoom() {
     setSession({ ...session, brandName: name });
     setBrandSaved(true);
     setTimeout(() => setBrandSaved(false), 1500);
+  };
+
+  // Toggle collecting each player's phone + State/LGA at join.
+  const toggleCollect = async () => {
+    if (!session) return;
+    const next = !session.collectPlayerInfo;
+    setSession({ ...session, collectPlayerInfo: next });
+    try {
+      await setCollectPlayerInfo(session.id, next);
+    } catch {
+      setSession((s) => (s ? { ...s, collectPlayerInfo: !next } : s));
+    }
+  };
+
+  const downloadContacts = async () => {
+    if (!session) return;
+    try {
+      const rows = await getSessionContacts(session.id);
+      if (rows.length === 0) {
+        showError("No contacts yet", "Numbers appear here as players join.");
+        return;
+      }
+      const esc = (v: string) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+      const csv = [
+        ["Nickname", "Phone", "State", "LGA/LCDA", "Joined"].join(","),
+        ...rows.map((r) => [r.nickname, r.phone, r.state ?? "", r.lga ?? "", r.joinedAt ?? ""].map(esc).join(",")),
+      ].join("\r\n");
+      const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `players-${session.gamePin}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      showError("Couldn't download", "Please try again.");
+    }
   };
 
   // Pro: full-screen lobby cover image.
@@ -528,6 +566,47 @@ export default function HostWaitingRoom() {
             <p className="mt-2 text-center text-xs text-muted-foreground">
               ⚡ The game runs itself — questions open, close, reveal and advance automatically.
             </p>
+          )}
+
+          {/* Collect player phone + LGA at join */}
+          {session && (
+            <div className="mt-5 max-w-md mx-auto">
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
+                <div className="flex items-start gap-2.5 min-w-0">
+                  <ClipboardList className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium">Collect player details</div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Ask each player for phone + State/LGA before they join. Numbers stay private to you.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  role="switch"
+                  aria-checked={session.collectPlayerInfo}
+                  onClick={toggleCollect}
+                  className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${
+                    session.collectPlayerInfo ? "gradient-primary" : "bg-muted"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                      session.collectPlayerInfo ? "translate-x-5" : ""
+                    }`}
+                  />
+                </button>
+              </div>
+              {session.collectPlayerInfo && (
+                <Button
+                  variant="outline"
+                  onClick={downloadContacts}
+                  className="mt-2 w-full rounded-xl h-10"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Download player contacts (CSV)
+                </Button>
+              )}
+            </div>
           )}
 
           {/* Full-screen lobby cover image (Pro) */}

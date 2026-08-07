@@ -818,11 +818,14 @@ function LeaderboardRow({
   if (compact) {
     return (
       <div className="flex items-center justify-between py-2 px-4 text-sm">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <span className="w-6 text-white/60">{entry.rank}</span>
-          <span>{entry.nickname}</span>
+          <span className="truncate">
+            {entry.nickname}
+            {entry.lga && <span className="text-white/40"> — {entry.lga}</span>}
+          </span>
         </div>
-        <span className="font-semibold">{entry.totalPoints.toLocaleString()}</span>
+        <span className="font-semibold shrink-0 ml-2">{entry.totalPoints.toLocaleString()}</span>
       </div>
     );
   }
@@ -840,7 +843,10 @@ function LeaderboardRow({
             {entry.rank}
           </span>
         )}
-        <span className="text-xl font-semibold">{entry.nickname}</span>
+        <span className="text-xl font-semibold">
+          {entry.nickname}
+          {entry.lga && <span className="text-white/40 text-base font-normal"> — {entry.lga}</span>}
+        </span>
       </div>
       <div className="text-right">
         <div className="text-2xl font-bold">{entry.totalPoints.toLocaleString()}</div>

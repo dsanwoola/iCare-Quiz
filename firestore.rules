@@ -195,7 +195,7 @@ service cloud.firestore {
       // ---------- Participants ----------
       function validParticipantCreate() {
         return onlyFields(['uid','nickname','role','totalPoints','streak','isKicked',
-                           'teamId','teamName','teamColor','joinedAt']) &&
+                           'teamId','teamName','teamColor','lga','joinedAt']) &&
           request.resource.data.uid == request.auth.uid &&
           validStr('nickname', 1, 20) &&
           request.resource.data.role == 'PLAYER' &&
@@ -203,6 +203,7 @@ service cloud.firestore {
           request.resource.data.streak == 0 &&
           request.resource.data.isKicked == false &&
           (request.resource.data.teamId == null || request.resource.data.teamId is string) &&
+          (request.resource.data.get('lga', null) == null || request.resource.data.lga is string) &&
           sessionExists(sessionId) &&
           sessionData(sessionId).status != 'ENDED' &&
           sessionData(sessionId).isRoomLocked == false;
@@ -215,12 +216,28 @@ service cloud.firestore {
         // Host mutates score/streak/kick and team assignment; identity frozen.
         allow update: if isSessionHost(sessionId) &&
           onlyFields(['uid','nickname','role','totalPoints','streak','isKicked',
-                      'teamId','teamName','teamColor','joinedAt']) &&
-          notChanging(['uid','nickname','role','joinedAt']) &&
+                      'teamId','teamName','teamColor','lga','joinedAt']) &&
+          notChanging(['uid','nickname','role','lga','joinedAt']) &&
           request.resource.data.totalPoints is number &&
           request.resource.data.streak is number &&
           request.resource.data.isKicked is bool;
         allow delete: if isSessionHost(sessionId);
+      }
+
+      // ---------- Collected player contacts (host-private) ----------
+      // A player writes their own contact (phone + location) when the host has
+      // enabled collection. Only the session host (or the owner) may read it —
+      // phone numbers are never exposed to other players.
+      match /contacts/{contactUid} {
+        allow read: if isSessionHost(sessionId) || isOwner(contactUid);
+        allow create: if isOwner(contactUid) &&
+          onlyFields(['uid','nickname','phone','state','lga','joinedAt']) &&
+          request.resource.data.uid == request.auth.uid &&
+          validStr('phone', 3, 30) &&
+          validStr('nickname', 1, 20) &&
+          sessionExists(sessionId) &&
+          sessionData(sessionId).collectPlayerInfo == true;
+        allow update, delete: if false;
       }
 
       // ---------- Answers (doc id is `${questionId}_${uid}`) ----------

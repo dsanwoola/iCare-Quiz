@@ -5,6 +5,7 @@ import { Input } from "@/react-app/components/ui/input";
 import { ArrowLeft, Users, Zap, Sparkles, Loader2 } from "lucide-react";
 import { sounds, playSound, initAudio } from "@/react-app/lib/feedback";
 import { getSessionByPin, joinSession } from "@/react-app/lib/data";
+import { NIGERIA_STATES, NIGERIA_LGAS } from "@/react-app/data/nigeria";
 
 export default function JoinGame() {
   const navigate = useNavigate();
@@ -16,6 +17,10 @@ export default function JoinGame() {
   const [isLoading, setIsLoading] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isValidatingPin, setIsValidatingPin] = useState(!!urlPin);
+  const [collectInfo, setCollectInfo] = useState(false);
+  const [phone, setPhone] = useState("");
+  const [stateSel, setStateSel] = useState("");
+  const [lgaSel, setLgaSel] = useState("");
 
   // Validate PIN from URL on mount
   useEffect(() => {
@@ -32,6 +37,7 @@ export default function JoinGame() {
     try {
       const data = await getSessionByPin(pin);
       sessionStorage.setItem("quizTitle", data.quizTitle);
+      setCollectInfo(data.collectPlayerInfo);
       setStep("nickname");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Game not found");
@@ -58,6 +64,7 @@ export default function JoinGame() {
       const data = await getSessionByPin(gamePin);
       playSound(sounds.correct);
       sessionStorage.setItem("quizTitle", data.quizTitle);
+      setCollectInfo(data.collectPlayerInfo);
       setIsTransitioning(true);
       setTimeout(() => {
         setStep("nickname");
@@ -89,9 +96,31 @@ export default function JoinGame() {
       return;
     }
 
+    if (collectInfo) {
+      if (phone.replace(/\D/g, "").length < 7) {
+        setError("Enter a valid phone number");
+        playSound(sounds.wrong);
+        return;
+      }
+      if (!stateSel) {
+        setError("Select your State");
+        playSound(sounds.wrong);
+        return;
+      }
+      if (!lgaSel) {
+        setError("Select your LGA / LCDA");
+        playSound(sounds.wrong);
+        return;
+      }
+    }
+
     setIsLoading(true);
     try {
-      const data = await joinSession(gamePin, trimmedNickname);
+      const data = await joinSession(
+        gamePin,
+        trimmedNickname,
+        collectInfo ? { phone: phone.trim(), state: stateSel, lga: lgaSel } : undefined
+      );
 
       playSound(sounds.gameStart);
       sessionStorage.setItem("participantId", data.participantId);
@@ -243,6 +272,54 @@ export default function JoinGame() {
                 {nickname.length}/20 characters
               </div>
 
+              {collectInfo && (
+                <div className="space-y-3 text-left">
+                  <input
+                    type="tel"
+                    inputMode="tel"
+                    placeholder="Phone number"
+                    value={phone}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      setError("");
+                    }}
+                    className="w-full h-12 sm:h-14 rounded-xl border-2 bg-card/50 backdrop-blur-sm px-4 text-base sm:text-lg focus:border-secondary focus:outline-none transition-all"
+                  />
+                  <select
+                    value={stateSel}
+                    onChange={(e) => {
+                      setStateSel(e.target.value);
+                      setLgaSel("");
+                      setError("");
+                    }}
+                    className="w-full h-12 sm:h-14 rounded-xl border-2 bg-card/50 backdrop-blur-sm px-4 text-base sm:text-lg focus:border-secondary focus:outline-none transition-all"
+                  >
+                    <option value="">Select State</option>
+                    {NIGERIA_STATES.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={lgaSel}
+                    onChange={(e) => {
+                      setLgaSel(e.target.value);
+                      setError("");
+                    }}
+                    disabled={!stateSel}
+                    className="w-full h-12 sm:h-14 rounded-xl border-2 bg-card/50 backdrop-blur-sm px-4 text-base sm:text-lg focus:border-secondary focus:outline-none transition-all disabled:opacity-50"
+                  >
+                    <option value="">{stateSel ? "Select LGA / LCDA" : "Select State first"}</option>
+                    {(NIGERIA_LGAS[stateSel] || []).map((l) => (
+                      <option key={l} value={l}>
+                        {l}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {error && (
                 <div className="bg-destructive/10 text-destructive rounded-xl px-4 py-2 sm:py-3 text-xs sm:text-sm text-center animate-shake">
                   {error}
@@ -251,7 +328,11 @@ export default function JoinGame() {
 
               <Button
                 type="submit"
-                disabled={nickname.trim().length < 2 || isLoading}
+                disabled={
+                  nickname.trim().length < 2 ||
+                  isLoading ||
+                  (collectInfo && (phone.replace(/\D/g, "").length < 7 || !stateSel || !lgaSel))
+                }
                 className="w-full gradient-secondary text-neutral-900 border-0 h-12 sm:h-16 text-lg sm:text-xl rounded-xl sm:rounded-2xl font-bold disabled:opacity-50 shadow-lg shadow-secondary/30 active:scale-[0.98] transition-transform"
               >
                 {isLoading ? (
