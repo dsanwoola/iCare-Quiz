@@ -788,6 +788,11 @@ export default function PlayerGame() {
                 )}
               </>
             )}
+
+            {/* Sponsor ad keeps running while players wait for the next question */}
+            <div className="mt-4">
+              <CountdownAdSlot sessionAd={sessionAd} defaultAd={config.defaultAd} dark />
+            </div>
           </div>
         )}
 
