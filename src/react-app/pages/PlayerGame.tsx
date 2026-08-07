@@ -881,6 +881,11 @@ export default function PlayerGame() {
             >
               Play Again
             </button>
+
+            {/* Sponsor ad on the final results screen */}
+            <div className="mt-6 sm:mt-8 w-full max-w-sm">
+              <CountdownAdSlot sessionAd={sessionAd} defaultAd={config.defaultAd} dark />
+            </div>
           </div>
         )}
       </main>
