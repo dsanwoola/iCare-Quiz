@@ -29,16 +29,22 @@ const adminAuth = getAuth();
 
 const app = express();
 
-// Canonical host: once the custom domain is verified and serving, set
-// CANONICAL_HOST (e.g. "neighbours.cloud") to 301-redirect every other host —
-// the default *.hosted.app URL and www.neighbours.cloud — to it. App Hosting
-// terminates the custom domain at its load balancer and forwards the INTERNAL
-// host in the plain Host header, so we read the true external host from
-// x-forwarded-host and deliberately do NOT fall back to Host: if that header
-// is absent we simply skip the redirect, so an apex request can never be
-// redirected to itself (no loop). /api/ is exempt so the Flutterwave webhook
-// (a server-to-server POST) is never redirected.
+// Canonical host: when CANONICAL_HOST is set, 301-redirect ONLY the hosts
+// listed in CANONICAL_REDIRECT_FROM (e.g. www.neighbours.games + the default
+// *.hosted.app URL) to it. Any other host — notably neighbours.cloud — keeps
+// serving on its own and is never redirected. App Hosting terminates the custom
+// domain at its load balancer and forwards the INTERNAL host in the plain Host
+// header, so we read the true external host from x-forwarded-host (no Host
+// fallback, so an apex request can never be redirected to itself — no loop).
+// /api/ is exempt so the Flutterwave webhook (a server-to-server POST) is never
+// redirected.
 const CANONICAL_HOST = (process.env.CANONICAL_HOST || "").toLowerCase();
+const CANONICAL_REDIRECT_FROM = new Set(
+  (process.env.CANONICAL_REDIRECT_FROM || "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+);
 if (CANONICAL_HOST) {
   app.use((req, res, next) => {
     const ext = (req.headers["x-forwarded-host"] || "")
@@ -46,7 +52,7 @@ if (CANONICAL_HOST) {
       .trim()
       .split(":")[0]
       .toLowerCase();
-    if (ext && ext !== CANONICAL_HOST && !req.path.startsWith("/api/")) {
+    if (ext && ext !== CANONICAL_HOST && CANONICAL_REDIRECT_FROM.has(ext) && !req.path.startsWith("/api/")) {
       return res.redirect(301, `https://${CANONICAL_HOST}${req.originalUrl}`);
     }
     next();

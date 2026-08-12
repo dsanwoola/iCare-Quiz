@@ -13,11 +13,16 @@ runConfig:
   maxInstances: 2
   concurrency: 80
 
-# The custom domain is verified and serving HTTPS, so make it canonical:
-# server.js 301-redirects the default *.hosted.app URL and www.neighbours.cloud
-# to https://neighbours.cloud (/api/ is exempt so webhooks aren't redirected).
+# neighbours.games is the canonical domain. server.js 301-redirects only the
+# hosts in CANONICAL_REDIRECT_FROM (www.neighbours.games + the default
+# *.hosted.app URL) to it; neighbours.cloud is intentionally NOT listed, so it
+# keeps serving independently. /api/ is exempt so webhooks aren't redirected.
 env:
   - variable: CANONICAL_HOST
-    value: neighbours.cloud
+    value: neighbours.games
+    availability:
+      - RUNTIME
+  - variable: CANONICAL_REDIRECT_FROM
+    value: www.neighbours.games,icare-quiz--icare-quiz-arena.us-east4.hosted.app
     availability:
       - RUNTIME
