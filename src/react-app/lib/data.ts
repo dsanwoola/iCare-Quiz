@@ -511,7 +511,8 @@ export async function joinSession(
   // Soft player cap by the host's tier (stamped on the session).
   const cap =
     typeof session.maxPlayers === "number" ? session.maxPlayers : DEFAULT_APP_CONFIG.limits.maxPlayers.free;
-  if (active.length >= cap) {
+  // cap <= 0 means unlimited (super-admin games).
+  if (cap > 0 && active.length >= cap) {
     throw new Error("This game is full — the host needs a bigger plan to add more players.");
   }
 

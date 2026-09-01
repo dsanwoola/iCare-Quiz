@@ -11,6 +11,8 @@ interface AppConfigContextValue {
   subscription: Subscription | null;
   /** The signed-in user's effective tier (admin → business; comp → pro; else sub or free). */
   tier: Tier;
+  /** True when the signed-in user is an app super-admin (ADMIN_EMAILS). */
+  isAdmin: boolean;
   /** True when the effective tier is at least `min`. */
   atLeast: (min: Tier) => boolean;
   /** Is the signed-in user Pro or higher? (back-compat convenience) */
@@ -43,7 +45,8 @@ export function AppConfigProvider({ children }: { children: ReactNode }) {
   }, [isHost, user?.id]);
 
   const email = user?.email ?? null;
-  const tier: Tier = isAdminEmail(email)
+  const isAdmin = isAdminEmail(email);
+  const tier: Tier = isAdmin
     ? "business"
     : isProEmail(email, config.proEmails)
     ? "pro"
@@ -57,6 +60,7 @@ export function AppConfigProvider({ children }: { children: ReactNode }) {
         loading,
         subscription,
         tier,
+        isAdmin,
         atLeast,
         isProUser: atLeast("pro"),
         isPro: (e) => isProEmail(e ?? null, config.proEmails),

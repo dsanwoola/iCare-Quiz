@@ -68,7 +68,7 @@ export default function HostWaitingRoom() {
   const coverInputRef = useRef<HTMLInputElement>(null);
   const autoStartedRef = useRef(false);
   const { showError } = useToast();
-  const { config, tier, atLeast, isProUser: pro } = useAppConfig();
+  const { config, tier, atLeast, isProUser: pro, isAdmin } = useAppConfig();
   const biz = atLeast("business");
 
   const applyGameMode = async (mode: GameMode) => {
@@ -356,7 +356,8 @@ export default function HostWaitingRoom() {
   useEffect(() => {
     if (!session) return;
     setBrandName(session.brandName ?? "");
-    const cap = config.limits.maxPlayers[tier];
+    // Super-admins get unlimited players (-1); everyone else gets their tier cap.
+    const cap = isAdmin ? -1 : config.limits.maxPlayers[tier];
     if (session.maxPlayers !== cap) {
       setSession((s) => (s ? { ...s, maxPlayers: cap } : s));
       setSessionMaxPlayers(session.id, cap).catch(() => {});
