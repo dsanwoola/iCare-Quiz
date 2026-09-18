@@ -21,6 +21,7 @@ import {
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { signInAnonymously } from "firebase/auth";
 import { auth, db, storage } from "./firebase";
+import { reportError } from "./errorReporter";
 import type {
   AnswerResult,
   CurrentQuestion,
@@ -49,6 +50,7 @@ import type {
   PlayerContact,
   StickyNote,
   ActiveBoard,
+  ClientErrorReport,
 } from "@/shared/types";
 import {
   PRESET_TEAMS,
@@ -77,7 +79,14 @@ function requireUid(): string {
  */
 export async function ensurePlayerAuth(): Promise<string> {
   await auth.authStateReady();
-  if (!auth.currentUser) await signInAnonymously(auth);
+  if (!auth.currentUser) {
+    try {
+      await signInAnonymously(auth);
+    } catch (err) {
+      reportError("auth", err);
+      throw err;
+    }
+  }
   return auth.currentUser!.uid;
 }
 
@@ -479,9 +488,18 @@ export function subscribeSession(
   sessionId: string,
   cb: (session: SessionInfo | null) => void
 ): () => void {
-  return onSnapshot(doc(db, "sessions", sessionId), (snap) => {
-    cb(snap.exists() ? sessionInfoFromDoc(snap.id, snap.data()) : null);
-  });
+  return onSnapshot(
+    doc(db, "sessions", sessionId),
+    (snap) => {
+      cb(snap.exists() ? sessionInfoFromDoc(snap.id, snap.data()) : null);
+    },
+    // A listener error is terminal: without this the screen would keep saying
+    // "Connected" while never updating again. Report it and show disconnected.
+    (err) => {
+      reportError("session", err);
+      cb(null);
+    }
+  );
 }
 
 export async function getSessionByPin(pin: string): Promise<SessionInfo> {
@@ -761,6 +779,30 @@ export async function setSessionBrand(sessionId: string, brandName: string | nul
   await updateDoc(doc(db, "sessions", sessionId), {
     brandName: brandName,
     updatedAt: serverTimestamp(),
+  });
+}
+
+/** Admin: most recent error reports from players' phones. */
+export async function getClientErrors(max = 200): Promise<ClientErrorReport[]> {
+  const snap = await getDocs(
+    query(collection(db, "clientErrors"), orderBy("createdAt", "desc"), qLimit(max))
+  );
+  return snap.docs.map((d) => {
+    const x = d.data();
+    return {
+      id: d.id,
+      createdAt: tsToIso(x.createdAt),
+      stage: x.stage ?? "unknown",
+      code: x.code ?? null,
+      message: x.message ?? null,
+      pin: x.pin ?? null,
+      browser: x.browser ?? null,
+      ua: x.ua ?? null,
+      online: typeof x.online === "boolean" ? x.online : null,
+      network: x.network ?? null,
+      extra: x.extra ?? null,
+      ipHash: x.ipHash ?? null,
+    };
   });
 }
 
@@ -1280,9 +1322,17 @@ export function subscribeSessionRaw(
   sessionId: string,
   cb: (data: DocumentData | null) => void
 ): () => void {
-  return onSnapshot(doc(db, "sessions", sessionId), (snap) => {
-    cb(snap.exists() ? snap.data() : null);
-  });
+  return onSnapshot(
+    doc(db, "sessions", sessionId),
+    (snap) => {
+      cb(snap.exists() ? snap.data() : null);
+    },
+    // Terminal listener error — report it and flip the player to disconnected.
+    (err) => {
+      reportError("session", err);
+      cb(null);
+    }
+  );
 }
 
 /**

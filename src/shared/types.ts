@@ -52,6 +52,23 @@ export interface StickyNote {
   createdAt: string;
 }
 
+/** A failure reported from a player's phone (Firestore: clientErrors, admin-read). */
+export interface ClientErrorReport {
+  id: string;
+  createdAt: string;
+  stage: string;
+  code: string | null;
+  message: string | null;
+  pin: string | null;
+  browser: string | null;
+  ua: string | null;
+  online: boolean | null;
+  network: string | null;
+  extra: string | null;
+  /** Short hash of the reporter's IP — same value = same connection/venue. */
+  ipHash: string | null;
+}
+
 /** A standalone board the host can open any time (lobby or mid-game). */
 export interface ActiveBoard {
   id: string;

@@ -6,6 +6,7 @@ import { ArrowLeft, Users, Zap, Sparkles, Loader2, RotateCcw } from "lucide-reac
 import { sounds, playSound, initAudio } from "@/react-app/lib/feedback";
 import { getSessionByPin, joinSession, resumeSession } from "@/react-app/lib/data";
 import type { JoinResult } from "@/shared/types";
+import { reportError, isSystemError } from "@/react-app/lib/errorReporter";
 import { NIGERIA_STATES, NIGERIA_LGAS } from "@/react-app/data/nigeria";
 
 /** Remembers the last game this device joined, so a player who closed the tab
@@ -87,6 +88,7 @@ export default function JoinGame() {
       setCollectInfo(data.collectPlayerInfo);
       setStep("nickname");
     } catch (err) {
+      if (isSystemError(err)) reportError("join-link", err, { pin });
       setError(err instanceof Error ? err.message : "Game not found");
       setStep("pin");
     } finally {
@@ -125,6 +127,7 @@ export default function JoinGame() {
         setIsTransitioning(false);
       }, 200);
     } catch (err) {
+      if (isSystemError(err)) reportError("join-pin", err, { pin: gamePin });
       setError(err instanceof Error ? err.message : "Game not found");
       playSound(sounds.wrong);
     } finally {
@@ -179,6 +182,7 @@ export default function JoinGame() {
       playSound(sounds.gameStart);
       enterGame(data, gamePin);
     } catch (err) {
+      if (isSystemError(err)) reportError("join", err, { pin: gamePin });
       setError(err instanceof Error ? err.message : "Could not join game");
       playSound(sounds.wrong);
     } finally {

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router";
 import { Zap, Clock, Trophy, CheckCircle2, XCircle, Wifi, WifiOff, Loader2, Star, Medal, Volume2, VolumeX } from "lucide-react";
 import type { CurrentQuestion, AnswerResult, LeaderboardEntry, Team, QuestionOption, ActiveBoard } from "@/shared/types";
 import NoteComposer from "@/react-app/components/NoteComposer";
+import { reportError } from "@/react-app/lib/errorReporter";
 import { isOptionType } from "@/shared/types";
 import { ArrowUp, ArrowDown } from "lucide-react";
 import { sounds, playSound, initAudio, setMuted, getMuted } from "@/react-app/lib/feedback";
@@ -339,7 +340,12 @@ export default function PlayerGame() {
       console.error("Failed to submit answer", err);
       // Usually means this answer was already recorded before a reconnect —
       // show them as locked in rather than leaving them stuck on the question.
-      if (await hasAnswered(sessionId, question.questionId)) setPhase("ANSWERED");
+      if (await hasAnswered(sessionId, question.questionId)) {
+        setPhase("ANSWERED");
+      } else if (timeRemaining !== 0) {
+        // Not a late tap after time ran out — a genuine failure worth seeing.
+        reportError("submit", err, { questionId: question.questionId });
+      }
     } finally {
       setIsSubmitting(false);
     }

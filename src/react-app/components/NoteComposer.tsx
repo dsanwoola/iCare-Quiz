@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Loader2, Send, Check } from "lucide-react";
 import { NOTE_CHAR_LIMIT, NOTE_COLORS } from "@/shared/types";
 import { postNote } from "@/react-app/lib/data";
+import { reportError, isSystemError } from "@/react-app/lib/errorReporter";
 
 interface NoteComposerProps {
   sessionId: string;
@@ -67,6 +68,7 @@ export default function NoteComposer({
       // Re-roll the colour so a player's notes aren't all identical.
       setColor(Math.floor(Math.random() * NOTE_COLORS.length));
     } catch (e) {
+      if (isSystemError(e)) reportError("notes", e, { boardId });
       setError(e instanceof Error ? e.message : "Couldn't post that. Try again.");
     } finally {
       setPosting(false);

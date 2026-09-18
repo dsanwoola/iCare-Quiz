@@ -10,6 +10,7 @@
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
@@ -246,6 +247,77 @@ app.post("/api/webhook/flutterwave", async (req, res) => {
     /* swallow — respond 200 so FLW doesn't hammer retries */
   }
   res.status(200).end();
+});
+
+// ---- client error reports ------------------------------------------------
+// Players' phones POST failures here (same origin, so it works even when their
+// browser can't reach Firebase). Stored via the Admin SDK in `clientErrors`
+// (admin-read-only in the rules; clients have no Firestore access to it) and
+// mirrored to Cloud Logging. Unauthenticated by necessity, so every field is
+// whitelisted + truncated, and volume is rate-limited per IP and globally.
+
+const clip = (v, n) => (typeof v === "string" ? v.slice(0, n) : null);
+const hashIp = (ip) =>
+  createHash("sha256").update(`nqa:${ip}`).digest("hex").slice(0, 10);
+
+// Generous per-IP limit: at events whole rooms share one venue/carrier IP.
+const PER_IP_PER_MIN = 200;
+const GLOBAL_PER_MIN = 2000;
+let windowStart = Date.now();
+let globalCount = 0;
+const perIp = new Map();
+
+function allowReport(ip) {
+  const now = Date.now();
+  if (now - windowStart > 60_000) {
+    windowStart = now;
+    globalCount = 0;
+    perIp.clear();
+  }
+  if (globalCount >= GLOBAL_PER_MIN) return false;
+  const n = (perIp.get(ip) || 0) + 1;
+  if (n > PER_IP_PER_MIN) return false;
+  perIp.set(ip, n);
+  globalCount++;
+  return true;
+}
+
+app.post("/api/client-log", async (req, res) => {
+  const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "")
+    .split(",")[0]
+    .trim();
+  if (!allowReport(ip)) return res.status(429).end();
+
+  const b = req.body || {};
+  const report = {
+    stage: clip(b.stage, 40) || "unknown",
+    code: clip(b.code, 80),
+    message: clip(b.message, 500),
+    path: clip(b.path, 120),
+    pin: typeof b.pin === "string" && /^\d{6}$/.test(b.pin) ? b.pin : null,
+    sessionId: clip(b.sessionId, 40),
+    browser: clip(b.browser, 40),
+    ua: clip(b.ua, 300),
+    online: typeof b.online === "boolean" ? b.online : null,
+    network: clip(b.network, 10),
+    extra: clip(b.extra, 300),
+    ipHash: hashIp(ip), // groups reports by connection without storing the IP
+  };
+
+  // Structured log line → Cloud Logging (searchable even if Firestore is down).
+  console.log(JSON.stringify({ severity: "WARNING", message: "client-error", ...report }));
+
+  try {
+    await db.collection("clientErrors").add({
+      ...report,
+      createdAt: FieldValue.serverTimestamp(),
+      // Auto-deleted after 30 days by a Firestore TTL policy on this field.
+      expireAt: new Date(Date.now() + 30 * 86_400_000),
+    });
+  } catch (e) {
+    console.error("clientErrors write failed:", e?.message);
+  }
+  res.status(204).end();
 });
 
 // ---- static site ---------------------------------------------------------

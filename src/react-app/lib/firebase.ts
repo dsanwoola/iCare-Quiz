@@ -1,8 +1,9 @@
 import { initializeApp } from "firebase/app";
-import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
+import { initializeAppCheck, onTokenChanged, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { reportError } from "./errorReporter";
 
 // Firebase web config. These values are NOT secrets — they are public
 // identifiers for the project. All access control is enforced by Firestore
@@ -37,6 +38,14 @@ export const appCheck = initializeAppCheck(app, {
   ),
   isTokenAutoRefreshEnabled: true,
 });
+
+// Report App Check failures (e.g. reCAPTCHA `browser_error` in WhatsApp's
+// in-app browser) so we can see which phones fail the security check.
+onTokenChanged(
+  appCheck,
+  () => {},
+  (err) => reportError("appcheck", err)
+);
 
 export const auth = getAuth(app);
 export const db = getFirestore(app);

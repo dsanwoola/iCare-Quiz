@@ -145,6 +145,14 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ---------- Client error reports ----------
+    // Written only by the server (/api/client-log via the Admin SDK); holds
+    // user agents and error details, so only the admin may read it.
+    match /clientErrors/{id} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // ---------- Per-user usage counters (soft AI quota) ----------
     // A user maintains their own monthly generation count. Soft-gate only.
     match /usage/{uid} {

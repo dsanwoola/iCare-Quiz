@@ -11,6 +11,7 @@ import type { GameMode } from "@/shared/types";
 import { GET_READY_OPTIONS } from "@/shared/types";
 import { useAppConfig } from "@/react-app/hooks/useAppConfig";
 import { updateAppConfig, uploadLogo } from "@/react-app/lib/data";
+import ClientErrorsPanel from "@/react-app/components/ClientErrorsPanel";
 
 export default function AdminPage() {
   const { config, loading } = useAppConfig();
@@ -176,6 +177,9 @@ export default function AdminPage() {
           </div>
         ) : (
           <>
+            {/* What's going wrong on players' phones */}
+            <ClientErrorsPanel />
+
             {/* Game pacing */}
             <Card className="p-6 rounded-2xl border-2">
               <h2 className="font-bold text-lg mb-1">Default game pacing</h2>
