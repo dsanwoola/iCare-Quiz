@@ -17,7 +17,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import { Users2, Timer, Zap, Hand, Megaphone, Sparkle, MessageCircle, Send, Link2, ImagePlus, CalendarClock, Trash2, ClipboardList, Download } from "lucide-react";
+import { Users2, Timer, Zap, Hand, Megaphone, Sparkle, MessageCircle, Send, Link2, ImagePlus, CalendarClock, Trash2, ClipboardList, Download, MonitorPlay } from "lucide-react";
 import type { SessionInfo, ParticipantInfo, Question, GameMode } from "@/shared/types";
 import { PRESET_TEAMS, GET_READY_OPTIONS } from "@/shared/types";
 import {
@@ -482,6 +482,18 @@ export default function HostWaitingRoom() {
                 </>
               )}
             </Button>
+
+            {session && (
+              <Button
+                variant="outline"
+                onClick={() => window.open(`/display/${session.id}`, "_blank")}
+                className="rounded-lg sm:rounded-xl h-9 sm:h-11 text-sm sm:text-base"
+                title="Open the audience screen for your projector"
+              >
+                <MonitorPlay className="w-4 h-4 mr-1.5 sm:mr-2" />
+                Big screen
+              </Button>
+            )}
 
             <Button
               variant="outline"

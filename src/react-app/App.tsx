@@ -14,6 +14,7 @@ import QuizAnalyticsPage from "@/react-app/pages/QuizAnalytics";
 import TemplatesPage from "@/react-app/pages/Templates";
 import HostWaitingRoom from "@/react-app/pages/HostWaitingRoom";
 import HostLiveGame from "@/react-app/pages/HostLiveGame";
+import DisplayView from "@/react-app/pages/DisplayView";
 import JoinGame from "@/react-app/pages/JoinGame";
 import PlayerWaitingRoom from "@/react-app/pages/PlayerWaitingRoom";
 import PlayerGame from "@/react-app/pages/PlayerGame";
@@ -39,6 +40,8 @@ export default function App() {
         <Route path="/host/session/new" element={<RequireHost><HostWaitingRoom /></RequireHost>} />
         <Route path="/host/session/:sessionId/waiting" element={<RequireHost><HostWaitingRoom /></RequireHost>} />
         <Route path="/host/session/:sessionId/live" element={<RequireHost><HostLiveGame /></RequireHost>} />
+        {/* Read-only audience screen for the projector (no controls). */}
+        <Route path="/display/:sessionId" element={<RequireHost><DisplayView /></RequireHost>} />
         <Route path="/join" element={<JoinGame />} />
         <Route path="/join/:gamePin" element={<JoinGame />} />
         <Route path="/play/:gamePin" element={<PlayerWaitingRoom />} />

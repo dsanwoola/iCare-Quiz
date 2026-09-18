@@ -16,6 +16,7 @@ import {
   Download,
   Volume2,
   VolumeX,
+  MonitorPlay,
 } from "lucide-react";
 import { sounds, playSound, initAudio, setMuted, getMuted } from "@/react-app/lib/feedback";
 import { useWakeLock } from "@/react-app/hooks/useWakeLock";
@@ -400,6 +401,15 @@ export default function HostLiveGame() {
             >
               {isSoundMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
             </button>
+            {sessionId && (
+              <button
+                onClick={() => window.open(`/display/${sessionId}`, "_blank")}
+                className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+                title="Open the audience screen for your projector"
+              >
+                <MonitorPlay className="w-5 h-5" />
+              </button>
+            )}
             {(isAuto || isProUser) && phase !== "COMPLETE" && (
               <button
                 onClick={toggleMode}

@@ -12,6 +12,8 @@ interface StickyWallProps {
   onDelete?: (noteId: string) => void;
   /** Compact mode for the smaller host panel (vs. full projector wall). */
   compact?: boolean;
+  /** Audience display: hide every control so nothing but the wall shows. */
+  readOnly?: boolean;
 }
 
 /** Stable pseudo-random from a note id, so tilt never changes on re-render. */
@@ -43,6 +45,7 @@ export default function StickyWall({
   maxNotes,
   onDelete,
   compact = false,
+  readOnly = false,
 }: StickyWallProps) {
   const [spotlight, setSpotlight] = useState<StickyNote | null>(null);
   const [handwritten, setHandwritten] = useState(true);
@@ -83,20 +86,24 @@ export default function StickyWall({
           <span className="rounded-full bg-neutral-900 text-white text-sm font-bold px-3 py-1.5 tabular-nums">
             {notes.length}
           </span>
-          <button
-            onClick={() => setHandwritten((h) => !h)}
-            title={handwritten ? "Switch to clean type" : "Switch to handwriting"}
-            className="p-2 rounded-lg hover:bg-neutral-200/70 text-neutral-600"
-          >
-            {handwritten ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-          </button>
-          <button
-            onClick={() => setShuffleSeed((s) => s + 1)}
-            title="Shuffle layout"
-            className="p-2 rounded-lg hover:bg-neutral-200/70 text-neutral-600"
-          >
-            <Shuffle className="w-4 h-4" />
-          </button>
+          {!readOnly && (
+            <>
+              <button
+                onClick={() => setHandwritten((h) => !h)}
+                title={handwritten ? "Switch to clean type" : "Switch to handwriting"}
+                className="p-2 rounded-lg hover:bg-neutral-200/70 text-neutral-600"
+              >
+                {handwritten ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+              </button>
+              <button
+                onClick={() => setShuffleSeed((s) => s + 1)}
+                title="Shuffle layout"
+                className="p-2 rounded-lg hover:bg-neutral-200/70 text-neutral-600"
+              >
+                <Shuffle className="w-4 h-4" />
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -146,7 +153,11 @@ export default function StickyWall({
                       }}
                     />
                     {/* host controls */}
-                    <div className="absolute -top-2 -right-2 hidden group-hover:flex gap-1">
+                    <div
+                      className={`absolute -top-2 -right-2 gap-1 ${
+                        readOnly ? "hidden" : "hidden group-hover:flex"
+                      }`}
+                    >
                       <button
                         onClick={() => setSpotlight(n)}
                         title="Spotlight"
