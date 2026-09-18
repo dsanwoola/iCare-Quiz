@@ -47,8 +47,16 @@ import type {
   Subscription,
   Tier,
   PlayerContact,
+  StickyNote,
+  ActiveBoard,
 } from "@/shared/types";
-import { PRESET_TEAMS, DEFAULT_APP_CONFIG } from "@/shared/types";
+import {
+  PRESET_TEAMS,
+  DEFAULT_APP_CONFIG,
+  isUngradedType,
+  NOTE_CHAR_LIMIT,
+  NOTE_COLORS,
+} from "@/shared/types";
 import { STARTER_TEMPLATES } from "@/react-app/data/templates";
 
 // ============================================
@@ -204,6 +212,8 @@ function appConfigFrom(data: DocumentData | undefined): AppConfig {
   const limits = data?.limits ?? {};
   const mp = limits.maxPlayers ?? {};
   const aq = limits.aiMonthlyQuota ?? {};
+  const np = limits.notesPerPlayer ?? {};
+  const wm = limits.wallMaxNotes ?? {};
   const num = (v: unknown, fallback: number) => (typeof v === "number" ? v : fallback);
   return {
     defaultGameMode: data?.defaultGameMode === "auto" ? "auto" : "manual",
@@ -239,6 +249,16 @@ function appConfigFrom(data: DocumentData | undefined): AppConfig {
         free: num(aq.free, D.limits.aiMonthlyQuota.free),
         pro: num(aq.pro, D.limits.aiMonthlyQuota.pro),
         business: num(aq.business, D.limits.aiMonthlyQuota.business),
+      },
+      notesPerPlayer: {
+        free: num(np.free, D.limits.notesPerPlayer.free),
+        pro: num(np.pro, D.limits.notesPerPlayer.pro),
+        business: num(np.business, D.limits.notesPerPlayer.business),
+      },
+      wallMaxNotes: {
+        free: num(wm.free, D.limits.wallMaxNotes.free),
+        pro: num(wm.pro, D.limits.wallMaxNotes.pro),
+        business: num(wm.business, D.limits.wallMaxNotes.business),
       },
     },
     trialDays: num(data?.trialDays, D.trialDays),
@@ -363,6 +383,11 @@ function sessionInfoFromDoc(id: string, data: DocumentData): SessionInfo {
       typeof data.maxPlayers === "number" ? data.maxPlayers : DEFAULT_APP_CONFIG.limits.maxPlayers.free,
     brandName: data.brandName ?? null,
     collectPlayerInfo: !!data.collectPlayerInfo,
+    notesPerPlayer:
+      typeof data.notesPerPlayer === "number"
+        ? data.notesPerPlayer
+        : DEFAULT_APP_CONFIG.limits.notesPerPlayer.free,
+    activeBoard: (data.activeBoard as ActiveBoard) ?? null,
     createdAt: tsToIso(data.createdAt),
   };
 }
@@ -433,6 +458,8 @@ export async function createSession(quizId: string): Promise<SessionInfo> {
     maxPlayers: config.limits.maxPlayers.free,
     brandName: null,
     collectPlayerInfo: false,
+    notesPerPlayer: config.limits.notesPerPlayer.free,
+    activeBoard: null,
     countdownStartedAt: null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -650,10 +677,16 @@ export async function setScheduledStart(sessionId: string, startAtMs: number | n
   });
 }
 
-/** Stamp the join cap on the session (from the host's tier). */
-export async function setSessionMaxPlayers(sessionId: string, maxPlayers: number): Promise<void> {
+/** Stamp the host's tier limits onto the session so players (who are anonymous
+ *  and have no tier of their own) can read the caps that apply to this game. */
+export async function setSessionLimits(
+  sessionId: string,
+  maxPlayers: number,
+  notesPerPlayer: number
+): Promise<void> {
   await updateDoc(doc(db, "sessions", sessionId), {
     maxPlayers: maxPlayers,
+    notesPerPlayer: notesPerPlayer,
     updatedAt: serverTimestamp(),
   });
 }
@@ -670,6 +703,88 @@ export async function setSessionBrand(sessionId: string, brandName: string | nul
 export async function setCollectPlayerInfo(sessionId: string, on: boolean): Promise<void> {
   await updateDoc(doc(db, "sessions", sessionId), {
     collectPlayerInfo: on,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+// ============================================
+// Sticky Wall (open-ended, ungraded note board)
+// ============================================
+
+/** Post a sticky note to a board. Notes are host-readable only, so the wall
+ *  stays anonymous to the room even though the author is recorded. */
+export async function postNote(
+  sessionId: string,
+  boardId: string,
+  text: string,
+  color: number,
+  nickname?: string | null
+): Promise<void> {
+  const uid = requireUid();
+  const clean = text.trim().slice(0, NOTE_CHAR_LIMIT);
+  if (!clean) throw new Error("Write something first.");
+  await addDoc(collection(db, "sessions", sessionId, "notes"), {
+    boardId,
+    text: clean,
+    color: Math.max(0, Math.min(NOTE_COLORS.length - 1, Math.floor(color) || 0)),
+    authorUid: uid,
+    authorNickname: nickname ?? null,
+    createdAt: serverTimestamp(),
+  });
+}
+
+/** Live wall feed for one board — HOST ONLY (rules deny players read access). */
+export function subscribeNotes(
+  sessionId: string,
+  boardId: string,
+  cb: (notes: StickyNote[]) => void
+): () => void {
+  return onSnapshot(
+    query(collection(db, "sessions", sessionId, "notes"), where("boardId", "==", boardId)),
+    (snap) => {
+      const notes: StickyNote[] = snap.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          boardId: data.boardId ?? boardId,
+          text: data.text ?? "",
+          color: typeof data.color === "number" ? data.color : 0,
+          authorUid: data.authorUid ?? "",
+          authorNickname: data.authorNickname ?? null,
+          createdAt: tsToIso(data.createdAt),
+        };
+      });
+      // Oldest first so the wall builds up in arrival order.
+      notes.sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
+      cb(notes);
+    },
+    () => cb([])
+  );
+}
+
+/** Host moderation: remove a note from the wall. */
+export async function deleteNote(sessionId: string, noteId: string): Promise<void> {
+  await deleteDoc(doc(db, "sessions", sessionId, "notes", noteId));
+}
+
+/** Host: open a standalone Sticky Wall (works in the lobby or mid-game). */
+export async function openQuickBoard(sessionId: string, prompt: string): Promise<ActiveBoard> {
+  const board: ActiveBoard = {
+    id: `qb-${Date.now()}`,
+    prompt: prompt.trim().slice(0, 300),
+    openedAt: Date.now(),
+  };
+  await updateDoc(doc(db, "sessions", sessionId), {
+    activeBoard: board,
+    updatedAt: serverTimestamp(),
+  });
+  return board;
+}
+
+/** Host: close the standalone Sticky Wall. */
+export async function closeQuickBoard(sessionId: string): Promise<void> {
+  await updateDoc(doc(db, "sessions", sessionId), {
+    activeBoard: null,
     updatedAt: serverTimestamp(),
   });
 }
@@ -893,6 +1008,18 @@ export async function revealQuestion(sessionId: string, questions: Question[]): 
   const index = sessionSnap.data().currentQuestionIndex ?? 0;
   const question = questions[index];
   if (!question) return;
+
+  // Sticky Wall (BOARD) is ungraded: no points to award, and we must NOT run the
+  // grading pass — it zeroes the streak of anyone without an `answers` doc, and
+  // on a board everyone posts notes instead of answers.
+  if (isUngradedType(question.type)) {
+    await updateDoc(sessionRef, {
+      questionStatus: "REVEAL",
+      revealedAnswers: [],
+      updatedAt: serverTimestamp(),
+    });
+    return;
+  }
 
   const durationMs = question.durationSeconds * 1000;
   const answersSnap = await getDocs(

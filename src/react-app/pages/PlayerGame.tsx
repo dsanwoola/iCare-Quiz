@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router";
 import { Zap, Clock, Trophy, CheckCircle2, XCircle, Wifi, WifiOff, Loader2, Star, Medal, Volume2, VolumeX } from "lucide-react";
-import type { CurrentQuestion, AnswerResult, LeaderboardEntry, Team, QuestionOption } from "@/shared/types";
+import type { CurrentQuestion, AnswerResult, LeaderboardEntry, Team, QuestionOption, ActiveBoard } from "@/shared/types";
+import NoteComposer from "@/react-app/components/NoteComposer";
 import { isOptionType } from "@/shared/types";
 import { ArrowUp, ArrowDown } from "lucide-react";
 import { sounds, playSound, initAudio, setMuted, getMuted } from "@/react-app/lib/feedback";
@@ -46,6 +47,8 @@ export default function PlayerGame() {
   const [getReadyTotal, setGetReadyTotal] = useState(10);
   const [getReadyRemaining, setGetReadyRemaining] = useState(0);
   const [sessionAd, setSessionAd] = useState<CountdownAd | null>(null);
+  const [notesPerPlayer, setNotesPerPlayer] = useState(1);
+  const [activeBoard, setActiveBoard] = useState<ActiveBoard | null>(null);
   const [isConnected, setIsConnected] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSoundMuted, setIsSoundMuted] = useState(() => getMuted());
@@ -115,6 +118,8 @@ export default function PlayerGame() {
       setTeamMode(!!data.teamMode);
       setTeams((data.teams || []) as Team[]);
       setSessionAd((data.ad as CountdownAd) ?? null);
+      setNotesPerPlayer(typeof data.notesPerPlayer === "number" ? data.notesPerPlayer : 1);
+      setActiveBoard((data.activeBoard as ActiveBoard) ?? null);
 
       if (data.status === "ENDED") {
         setPhase((p) => (p === "COMPLETE" ? p : "COMPLETE"));
@@ -452,8 +457,22 @@ export default function PlayerGame() {
           </div>
         )}
 
+        {/* Sticky Wall prompt (ungraded) — compose a note instead of answering */}
+        {phase === "QUESTION" && question && question.type === "BOARD" && sessionId && (
+          <div className="flex-1 flex items-center justify-center px-2 py-4">
+            <NoteComposer
+              sessionId={sessionId}
+              boardId={question.questionId}
+              prompt={question.prompt}
+              maxNotes={notesPerPlayer}
+              nickname={nickname}
+              dark
+            />
+          </div>
+        )}
+
         {/* Question active */}
-        {phase === "QUESTION" && question && (
+        {phase === "QUESTION" && question && question.type !== "BOARD" && (
           <div className="flex-1 flex flex-col">
             {/* Timer and Question progress row */}
             <div className="flex items-center justify-center gap-3 mb-3 sm:mb-4">
@@ -888,6 +907,20 @@ export default function PlayerGame() {
             <div className="mt-6 sm:mt-8 w-full max-w-sm">
               <CountdownAdSlot sessionAd={sessionAd} defaultAd={config.defaultAd} dark />
             </div>
+          </div>
+        )}
+
+        {/* Quick Board: the host opened a Sticky Wall — it takes over the screen */}
+        {activeBoard && sessionId && (
+          <div className="fixed inset-0 z-50 bg-gradient-to-br from-emerald-900 via-green-900 to-teal-900 flex items-center justify-center p-4 overflow-y-auto safe-area-inset">
+            <NoteComposer
+              sessionId={sessionId}
+              boardId={activeBoard.id}
+              prompt={activeBoard.prompt}
+              maxNotes={notesPerPlayer}
+              nickname={nickname}
+              dark
+            />
           </div>
         )}
       </main>

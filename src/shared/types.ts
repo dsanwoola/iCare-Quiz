@@ -6,14 +6,57 @@ import { z } from "zod";
 
 // MCQ = single choice, TF = true/false, MULTI = multiple choice,
 // SHORT = type-the-answer (text), NUMERIC = numeric answer (with tolerance),
-// ORDER = arrange the options into the correct sequence.
-export const QuestionTypeEnum = z.enum(["MCQ", "TF", "MULTI", "SHORT", "NUMERIC", "ORDER"]);
+// ORDER = arrange the options into the correct sequence,
+// BOARD = Sticky Wall: open-ended, UNGRADED prompt whose answers appear as
+//         anonymous sticky notes on the host's big screen.
+export const QuestionTypeEnum = z.enum(["MCQ", "TF", "MULTI", "SHORT", "NUMERIC", "ORDER", "BOARD"]);
 export type QuestionType = z.infer<typeof QuestionTypeEnum>;
 
 /** Option-based "pick" types render answer buttons; the rest take other input. */
 export const OPTION_TYPES: QuestionType[] = ["MCQ", "TF", "MULTI"];
 export function isOptionType(type: QuestionType): boolean {
   return OPTION_TYPES.includes(type);
+}
+
+/** Ungraded activity types: no correct answer, no points, no streak effect. */
+export function isUngradedType(type: QuestionType): boolean {
+  return type === "BOARD";
+}
+
+// ---- Sticky Wall ----------------------------------------------------------
+
+/** Max characters on a single sticky note (keeps notes readable on a wall). */
+export const NOTE_CHAR_LIMIT = 140;
+
+/** Sticky-note palette (brand-harmonised). Index is stored on the note. */
+export const NOTE_COLORS: { bg: string; ink: string }[] = [
+  { bg: "#FEF08A", ink: "#713F12" }, // butter
+  { bg: "#BBF7D0", ink: "#14532D" }, // mint
+  { bg: "#BAE6FD", ink: "#0C4A6E" }, // sky
+  { bg: "#FECACA", ink: "#7F1D1D" }, // coral
+  { bg: "#DDD6FE", ink: "#4C1D95" }, // lavender
+  { bg: "#FED7AA", ink: "#7C2D12" }, // peach
+  { bg: "#D9F99D", ink: "#365314" }, // sage
+];
+
+/** A sticky note posted to the wall. Host-readable only (carries authorUid). */
+export interface StickyNote {
+  id: string;
+  /** Quiz question id, or the id of a standalone Quick Board. */
+  boardId: string;
+  text: string;
+  /** Index into NOTE_COLORS. */
+  color: number;
+  authorUid: string;
+  authorNickname: string | null;
+  createdAt: string;
+}
+
+/** A standalone board the host can open any time (lobby or mid-game). */
+export interface ActiveBoard {
+  id: string;
+  prompt: string;
+  openedAt: number;
 }
 
 export const QuestionOptionSchema = z.object({
@@ -41,12 +84,21 @@ export const QuestionInputSchema = z.object({
   // Empty for SHORT/NUMERIC (typed-answer) questions.
   options: z.array(QuestionOptionSchema).max(6),
   // For option types: correct option ids. For SHORT: accepted text answers.
-  // For NUMERIC: a single stringified number.
-  correctAnswers: z.array(z.string()).min(1, "Provide at least one correct answer"),
+  // For NUMERIC: a single stringified number. Empty for ungraded BOARD prompts.
+  correctAnswers: z.array(z.string()),
   // Optional ± tolerance for NUMERIC questions.
   numericTolerance: z.number().min(0).optional(),
   durationSeconds: z.number().min(5).max(300).default(10),
   basePoints: z.number().min(1).max(5000).default(1000),
+}).superRefine((q, ctx) => {
+  // Every graded type needs at least one correct answer; BOARD is ungraded.
+  if (!isUngradedType(q.type) && q.correctAnswers.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["correctAnswers"],
+      message: "Provide at least one correct answer",
+    });
+  }
 });
 export type QuestionInput = z.infer<typeof QuestionInputSchema>;
 
@@ -140,10 +192,14 @@ export interface SessionInfo {
   scheduledStartAt: number | null;
   /** Max players allowed to join, stamped from the host's tier. */
   maxPlayers: number;
+  /** Sticky-note allowance per player, stamped from the host's tier. */
+  notesPerPlayer: number;
   /** Business white-label: brand shown to players in place of the app name. */
   brandName: string | null;
   /** When true, the join form collects each player's phone + State/LGA. */
   collectPlayerInfo: boolean;
+  /** A standalone Sticky Wall the host opened (lobby or mid-game), or null. */
+  activeBoard: ActiveBoard | null;
   createdAt: string;
 }
 
@@ -217,6 +273,10 @@ export interface PlanCatalog {
 export interface TierLimits {
   maxPlayers: Record<Tier, number>;
   aiMonthlyQuota: Record<Tier, number>; // AI_UNLIMITED (-1) = unlimited
+  /** Sticky Wall: notes a single player may post per board. */
+  notesPerPlayer: Record<Tier, number>;
+  /** Sticky Wall: notes rendered on the wall (-1 = unlimited). */
+  wallMaxNotes: Record<Tier, number>;
 }
 
 /** App-wide settings an admin controls (Firestore: config/app). */
@@ -250,6 +310,8 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   limits: {
     maxPlayers: { free: 10, pro: 300, business: 2000 },
     aiMonthlyQuota: { free: 3, pro: 50, business: AI_UNLIMITED },
+    notesPerPlayer: { free: 1, pro: 5, business: 5 },
+    wallMaxNotes: { free: 30, pro: AI_UNLIMITED, business: AI_UNLIMITED },
   },
   trialDays: 7,
 };

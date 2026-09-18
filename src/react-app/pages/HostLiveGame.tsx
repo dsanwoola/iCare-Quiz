@@ -21,6 +21,7 @@ import { sounds, playSound, initAudio, setMuted, getMuted } from "@/react-app/li
 import { useWakeLock } from "@/react-app/hooks/useWakeLock";
 import CountdownRing from "@/react-app/components/CountdownRing";
 import CountdownAdSlot from "@/react-app/components/CountdownAd";
+import StickyWall from "@/react-app/components/StickyWall";
 import { useAppConfig } from "@/react-app/hooks/useAppConfig";
 import type {
   SessionInfo,
@@ -31,6 +32,7 @@ import type {
   Question,
   ParticipantInfo,
   TeamStanding,
+  StickyNote,
 } from "@/shared/types";
 import { isOptionType } from "@/shared/types";
 import {
@@ -49,6 +51,9 @@ import {
   computeTeamStandings,
   setGameMode,
   exportSessionCsv,
+  subscribeNotes,
+  deleteNote,
+  closeQuickBoard,
 } from "@/react-app/lib/data";
 import { Zap, Hand } from "lucide-react";
 
@@ -57,8 +62,9 @@ type GamePhase = "PREVIEW" | "GET_READY" | "QUESTION_OPEN" | "QUESTION_CLOSED" |
 export default function HostLiveGame() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
-  const { config, isProUser } = useAppConfig();
+  const { config, tier, isProUser } = useAppConfig();
 
+  const [notes, setNotes] = useState<StickyNote[]>([]);
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -76,6 +82,21 @@ export default function HostLiveGame() {
   const [answerCount, setAnswerCount] = useState(0);
   const [countdownRemaining, setCountdownRemaining] = useState(0);
   const [isSoundMuted, setIsSoundMuted] = useState(() => getMuted());
+
+  // Which Sticky Wall is live: a standalone Quick Board wins, else a BOARD question.
+  const liveBoardId =
+    session?.activeBoard?.id ?? (question?.type === "BOARD" ? question.questionId : null);
+  const liveBoardPrompt = session?.activeBoard?.prompt ?? question?.prompt ?? "";
+
+  // Only the host subscribes to notes — that's what keeps the wall anonymous to
+  // the room (players have no read access) and the fan-out to a single listener.
+  useEffect(() => {
+    if (!sessionId || !liveBoardId) {
+      setNotes([]);
+      return;
+    }
+    return subscribeNotes(sessionId, liveBoardId, setNotes);
+  }, [sessionId, liveBoardId]);
   const lastTickTime = useRef<number | null>(null);
 
   // Build a player-safe current question view from the loaded quiz.
@@ -412,8 +433,32 @@ export default function HostLiveGame() {
           </div>
         )}
 
+        {/* Sticky Wall — the big screen. A Quick Board overrides the quiz flow. */}
+        {liveBoardId && sessionId && (
+          <div className="h-[calc(100vh-15rem)] min-h-[420px]">
+            <StickyWall
+              prompt={liveBoardPrompt}
+              notes={notes}
+              maxNotes={config.limits.wallMaxNotes[tier]}
+              onDelete={(id) => deleteNote(sessionId, id).catch(() => {})}
+            />
+            {session?.activeBoard && (
+              <div className="mt-3 text-center">
+                <Button
+                  variant="outline"
+                  onClick={() => closeQuickBoard(sessionId).catch(() => {})}
+                  className="rounded-xl"
+                >
+                  Close board
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Question Preview / Active / Reveal */}
-        {(phase === "PREVIEW" || phase === "QUESTION_OPEN" || phase === "QUESTION_CLOSED" || phase === "REVEAL") && question && (
+        {!liveBoardId &&
+          (phase === "PREVIEW" || phase === "QUESTION_OPEN" || phase === "QUESTION_CLOSED" || phase === "REVEAL") && question && (
           <div className="space-y-8">
             {/* Timer */}
             {phase === "QUESTION_OPEN" && timeRemaining !== null && (

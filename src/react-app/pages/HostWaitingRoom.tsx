@@ -33,7 +33,11 @@ import {
   setSessionAd,
   setSessionCover,
   setScheduledStart,
-  setSessionMaxPlayers,
+  setSessionLimits,
+  openQuickBoard,
+  closeQuickBoard,
+  subscribeNotes,
+  deleteNote,
   setSessionBrand,
   setCollectPlayerInfo,
   getSessionContacts,
@@ -41,6 +45,8 @@ import {
   startGame as startGameApi,
 } from "@/react-app/lib/data";
 import { useAppConfig } from "@/react-app/hooks/useAppConfig";
+import StickyWall from "@/react-app/components/StickyWall";
+import type { StickyNote } from "@/shared/types";
 
 export default function HostWaitingRoom() {
   const [searchParams] = useSearchParams();
@@ -62,6 +68,8 @@ export default function HostWaitingRoom() {
   const [adSaved, setAdSaved] = useState(false);
   const [brandName, setBrandName] = useState("");
   const [brandSaved, setBrandSaved] = useState(false);
+  const [quickPrompt, setQuickPrompt] = useState("");
+  const [notes, setNotes] = useState<StickyNote[]>([]);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [scheduleInput, setScheduleInput] = useState("");
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -351,6 +359,16 @@ export default function HostWaitingRoom() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nowMs, startAtMs, questions.length]);
 
+  // Host-only live feed for an open Quick Board.
+  useEffect(() => {
+    const boardId = session?.activeBoard?.id;
+    if (!session || !boardId) {
+      setNotes([]);
+      return;
+    }
+    return subscribeNotes(session.id, boardId, setNotes);
+  }, [session?.id, session?.activeBoard?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Stamp the join cap from the host's tier so the (public) session doc carries
   // it for the join screen to enforce.
   useEffect(() => {
@@ -358,9 +376,10 @@ export default function HostWaitingRoom() {
     setBrandName(session.brandName ?? "");
     // Super-admins get unlimited players (-1); everyone else gets their tier cap.
     const cap = isAdmin ? -1 : config.limits.maxPlayers[tier];
-    if (session.maxPlayers !== cap) {
-      setSession((s) => (s ? { ...s, maxPlayers: cap } : s));
-      setSessionMaxPlayers(session.id, cap).catch(() => {});
+    const notes = config.limits.notesPerPlayer[tier];
+    if (session.maxPlayers !== cap || session.notesPerPlayer !== notes) {
+      setSession((s) => (s ? { ...s, maxPlayers: cap, notesPerPlayer: notes } : s));
+      setSessionLimits(session.id, cap, notes).catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.id, tier, config]);
@@ -752,6 +771,67 @@ export default function HostWaitingRoom() {
                 {pro
                   ? "Shown to players between questions. Leave blank to show the default ad."
                   : "Players see a “your ad here” slot between questions — sell it once you're Pro."}
+              </p>
+            </div>
+          )}
+
+          {/* Sticky Wall — open an anonymous note board any time */}
+          {session && (
+            <div className="mt-5 max-w-md mx-auto">
+              <label className="flex items-center gap-1.5 text-sm font-medium mb-1.5 justify-center">
+                <Megaphone className="w-4 h-4 text-primary" />
+                Sticky Wall
+              </label>
+              {session.activeBoard ? (
+                <div className="rounded-xl border border-primary/30 bg-primary/5 p-3">
+                  <p className="text-sm font-semibold text-center mb-2">
+                    “{session.activeBoard.prompt}”
+                  </p>
+                  <div className="h-64 mb-2">
+                    <StickyWall
+                      prompt={session.activeBoard.prompt}
+                      notes={notes}
+                      maxNotes={config.limits.wallMaxNotes[tier]}
+                      onDelete={(id) => deleteNote(session.id, id).catch(() => {})}
+                      compact
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="w-full rounded-xl h-10"
+                    onClick={() => closeQuickBoard(session.id).catch(() => {})}
+                  >
+                    Close board
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    value={quickPrompt}
+                    onChange={(e) => setQuickPrompt(e.target.value)}
+                    maxLength={300}
+                    placeholder="Ask anything — e.g. What should we fix first?"
+                    className="flex-1 h-10 rounded-xl border border-border bg-card px-3 text-sm focus:outline-none focus:border-primary"
+                  />
+                  <Button
+                    variant="outline"
+                    className="rounded-xl h-10"
+                    disabled={!quickPrompt.trim()}
+                    onClick={() => {
+                      openQuickBoard(session.id, quickPrompt)
+                        .then((b) => {
+                          setSession((s) => (s ? { ...s, activeBoard: b } : s));
+                          setQuickPrompt("");
+                        })
+                        .catch(() => showError("Couldn't open the board", "Please try again"));
+                    }}
+                  >
+                    Open
+                  </Button>
+                </div>
+              )}
+              <p className="text-[11px] text-muted-foreground text-center mt-1.5">
+                Players type an answer; it lands here as an anonymous sticky note.
               </p>
             </div>
           )}

@@ -275,6 +275,30 @@ service cloud.firestore {
           request.resource.data.pointsAwarded is number;
         allow delete: if isSessionHost(sessionId);
       }
+
+      // ---------- Sticky Wall notes ----------
+      // HOST-ONLY READ. The wall renders on the host's big screen, so players
+      // can never query this collection — which is what keeps the wall
+      // anonymous to the room even though each note records its author for the
+      // host's moderation/export. A player may create their own note while the
+      // game is running; notes are immutable, and only the host can remove one.
+      match /notes/{noteId} {
+        allow read: if isSessionHost(sessionId);
+        allow create: if isOwner(request.resource.data.authorUid) &&
+          onlyFields(['boardId','text','color','authorUid','authorNickname','createdAt']) &&
+          request.resource.data.boardId is string &&
+          validStr('text', 1, 140) &&
+          request.resource.data.color is int &&
+          request.resource.data.color >= 0 &&
+          request.resource.data.color <= 6 &&
+          (request.resource.data.authorNickname == null ||
+           request.resource.data.authorNickname is string) &&
+          sessionExists(sessionId) &&
+          sessionData(sessionId).status != 'ENDED' &&
+          playerIsActive();
+        allow update: if false;
+        allow delete: if isSessionHost(sessionId);
+      }
     }
   }
 }

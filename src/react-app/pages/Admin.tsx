@@ -37,6 +37,12 @@ export default function AdminPage() {
   const [aiFree, setAiFree] = useState("3");
   const [aiPro, setAiPro] = useState("50");
   const [aiBiz, setAiBiz] = useState("-1");
+  const [noteFree, setNoteFree] = useState("1");
+  const [notePro, setNotePro] = useState("5");
+  const [noteBiz, setNoteBiz] = useState("5");
+  const [wallFree, setWallFree] = useState("30");
+  const [wallPro, setWallPro] = useState("-1");
+  const [wallBiz, setWallBiz] = useState("-1");
   const [trialDays, setTrialDays] = useState("7");
   const [saving, setSaving] = useState(false);
 
@@ -61,6 +67,12 @@ export default function AdminPage() {
     setAiFree(String(config.limits.aiMonthlyQuota.free));
     setAiPro(String(config.limits.aiMonthlyQuota.pro));
     setAiBiz(String(config.limits.aiMonthlyQuota.business));
+    setNoteFree(String(config.limits.notesPerPlayer.free));
+    setNotePro(String(config.limits.notesPerPlayer.pro));
+    setNoteBiz(String(config.limits.notesPerPlayer.business));
+    setWallFree(String(config.limits.wallMaxNotes.free));
+    setWallPro(String(config.limits.wallMaxNotes.pro));
+    setWallBiz(String(config.limits.wallMaxNotes.business));
     setTrialDays(String(config.trialDays));
   }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -101,6 +113,16 @@ export default function AdminPage() {
             free: Number(aiFree) || 0,
             pro: Number(aiPro) || 0,
             business: Number(aiBiz), // -1 = unlimited
+          },
+          notesPerPlayer: {
+            free: Math.max(1, Number(noteFree) || 1),
+            pro: Math.max(1, Number(notePro) || 1),
+            business: Math.max(1, Number(noteBiz) || 1),
+          },
+          wallMaxNotes: {
+            free: Number(wallFree) || 0,
+            pro: Number(wallPro), // -1 = unlimited
+            business: Number(wallBiz),
           },
         },
         trialDays: Math.max(0, Number(trialDays) || 0),
@@ -308,6 +330,18 @@ export default function AdminPage() {
                       <td className="pr-2"><Input type="number" value={aiFree} onChange={(e) => setAiFree(e.target.value)} /></td>
                       <td className="pr-2"><Input type="number" value={aiPro} onChange={(e) => setAiPro(e.target.value)} /></td>
                       <td><Input type="number" value={aiBiz} onChange={(e) => setAiBiz(e.target.value)} /></td>
+                    </tr>
+                    <tr>
+                      <td className="pr-3 font-medium">Notes / player</td>
+                      <td className="pr-2"><Input type="number" value={noteFree} onChange={(e) => setNoteFree(e.target.value)} /></td>
+                      <td className="pr-2"><Input type="number" value={notePro} onChange={(e) => setNotePro(e.target.value)} /></td>
+                      <td><Input type="number" value={noteBiz} onChange={(e) => setNoteBiz(e.target.value)} /></td>
+                    </tr>
+                    <tr>
+                      <td className="pr-3 font-medium">Wall size</td>
+                      <td className="pr-2"><Input type="number" value={wallFree} onChange={(e) => setWallFree(e.target.value)} /></td>
+                      <td className="pr-2"><Input type="number" value={wallPro} onChange={(e) => setWallPro(e.target.value)} /></td>
+                      <td><Input type="number" value={wallBiz} onChange={(e) => setWallBiz(e.target.value)} /></td>
                     </tr>
                   </tbody>
                 </table>

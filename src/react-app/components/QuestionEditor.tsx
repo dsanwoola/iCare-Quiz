@@ -23,6 +23,7 @@ import {
   Type,
   Hash,
   ListOrdered,
+  StickyNote,
   ImageIcon,
   X,
   Loader2,
@@ -50,6 +51,7 @@ const questionTypeConfig: Record<QuestionType, { label: string; icon: typeof Cir
   SHORT: { label: "Type Answer", icon: Type, description: "Players type a text answer" },
   NUMERIC: { label: "Numeric", icon: Hash, description: "Players enter a number" },
   ORDER: { label: "Ordering", icon: ListOrdered, description: "Arrange items in order" },
+  BOARD: { label: "Sticky Wall", icon: StickyNote, description: "Open answers on a note wall — no score" },
 };
 
 const durationOptions = [10, 15, 20, 30, 45, 60, 90, 120];
@@ -81,6 +83,9 @@ export default function QuestionEditor({ question, index, onChange, onDelete }: 
     } else if (type === "ORDER") {
       const options = question.options.length >= 2 && question.type !== "TF" ? question.options : emptyOptions(3);
       updateQuestion({ type, options, correctAnswers: options.map((o) => o.id) });
+    } else if (type === "BOARD") {
+      // Sticky Wall is ungraded: no options, no correct answers.
+      updateQuestion({ type, options: [], correctAnswers: [], numericTolerance: undefined });
     } else {
       // SHORT / NUMERIC — typed answers, no options.
       updateQuestion({ type, options: [], correctAnswers: [""], numericTolerance: type === "NUMERIC" ? 0 : undefined });
@@ -241,7 +246,18 @@ export default function QuestionEditor({ question, index, onChange, onDelete }: 
       </div>
 
       {/* Answers */}
-      {isOptionType(question.type) ? (
+      {question.type === "BOARD" ? (
+        <div className="mb-6 rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 p-4 flex items-start gap-3">
+          <StickyNote className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-semibold">No correct answer — this one's for discussion.</p>
+            <p className="text-muted-foreground">
+              Players type an answer on their phone and it appears on your big screen as an
+              anonymous sticky note. Nothing is scored, and streaks aren't affected.
+            </p>
+          </div>
+        </div>
+      ) : isOptionType(question.type) ? (
         <div className="space-y-3 mb-6">
           <p className="text-sm font-medium text-muted-foreground">
             {question.type === "MULTI" ? "Select all correct answers:" : "Select the correct answer:"}

@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router";
 import { Zap, Users, Wifi, WifiOff, Sparkles } from "lucide-react";
-import type { Team } from "@/shared/types";
+import type { Team, ActiveBoard } from "@/shared/types";
+import NoteComposer from "@/react-app/components/NoteComposer";
 import { subscribeSession, subscribeParticipants, ensurePlayerAuth } from "@/react-app/lib/data";
 import { useAppConfig } from "@/react-app/hooks/useAppConfig";
 import { useWakeLock } from "@/react-app/hooks/useWakeLock";
@@ -26,6 +27,8 @@ export default function PlayerWaitingRoom() {
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
   const [scheduledStartAt, setScheduledStartAt] = useState<number | null>(null);
   const [brandName, setBrandName] = useState<string | null>(null);
+  const [activeBoard, setActiveBoard] = useState<ActiveBoard | null>(null);
+  const [notesPerPlayer, setNotesPerPlayer] = useState(1);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const hasAlertedRef = useRef(false);
 
@@ -94,6 +97,8 @@ export default function PlayerWaitingRoom() {
       setCoverImageUrl(session.coverImageUrl);
       setScheduledStartAt(session.scheduledStartAt);
       setBrandName(session.brandName);
+      setActiveBoard(session.activeBoard);
+      setNotesPerPlayer(session.notesPerPlayer);
 
       // If game has started, navigate to game screen
       if (session.status === "LIVE") {
@@ -119,6 +124,22 @@ export default function PlayerWaitingRoom() {
       unsubPlayers();
     };
   }, [sessionId, participantId, gamePin, navigate]);
+
+  // A Quick Board takes over the lobby entirely while it's open.
+  if (activeBoard && sessionId) {
+    return (
+      <div className="min-h-[100dvh] bg-gradient-to-br from-emerald-900 via-green-900 to-teal-900 flex items-center justify-center p-4 overflow-y-auto safe-area-inset">
+        <NoteComposer
+          sessionId={sessionId}
+          boardId={activeBoard.id}
+          prompt={activeBoard.prompt}
+          maxNotes={notesPerPlayer}
+          nickname={nickname}
+          dark
+        />
+      </div>
+    );
+  }
 
   // Full-screen cover takeover: the host's lobby image dominates the screen
   // until the game starts, with a countdown / waiting bar along the bottom.
