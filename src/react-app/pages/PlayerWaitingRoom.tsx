@@ -76,7 +76,9 @@ export default function PlayerWaitingRoom() {
   useEffect(() => {
     // Redirect to join if no session info
     if (!sessionId || !participantId) {
-      navigate("/join");
+      // No seat in this tab (e.g. reopened in a new tab) — the join page will
+      // recognise this device and put the player straight back in.
+      navigate(gamePin ? `/join/${gamePin}` : "/join", { replace: true });
       return;
     }
 

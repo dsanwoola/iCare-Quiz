@@ -502,15 +502,9 @@ export async function getSessionByPin(pin: string): Promise<SessionInfo> {
   return sessionInfoFromDoc(d.id, d.data());
 }
 
-/** Join a session as an anonymous player. */
-export async function joinSession(
-  pin: string,
-  nickname: string,
-  info?: { phone?: string; state?: string; lga?: string }
-): Promise<JoinResult> {
-  const uid = await ensurePlayerAuth();
-
-  const sessionsSnap = await getDocs(
+/** The active (WAITING/LIVE) session for a PIN, or null. */
+async function findActiveSessionByPin(pin: string) {
+  const snap = await getDocs(
     query(
       collection(db, "sessions"),
       where("gamePin", "==", pin),
@@ -518,9 +512,80 @@ export async function joinSession(
       qLimit(1)
     )
   );
-  if (sessionsSnap.empty) throw new Error("Game not found. Check your PIN and try again.");
-  const sessionDoc = sessionsSnap.docs[0];
+  return snap.empty ? null : snap.docs[0];
+}
+
+/**
+ * If this device's player identity already has a seat in the session, return
+ * it so they can pick up where they left off (same score, streak and team).
+ * The anonymous uid persists on the device across refreshes and closed tabs,
+ * so a disconnected player is recognised without re-entering anything.
+ */
+async function resumeSeat(
+  sessionDoc: QueryDocumentSnapshot<DocumentData>,
+  uid: string
+): Promise<JoinResult | null> {
+  const meSnap = await getDoc(doc(db, "sessions", sessionDoc.id, "participants", uid));
+  if (!meSnap.exists()) return null;
+  const me = meSnap.data();
+  if (me.isKicked) throw new Error("You were removed from this game by the host.");
   const session = sessionDoc.data();
+  const team: Team | null = me.teamId
+    ? { id: me.teamId, name: me.teamName ?? "", color: me.teamColor ?? "" }
+    : null;
+  return {
+    participantId: uid,
+    sessionId: sessionDoc.id,
+    nickname: me.nickname,
+    quizTitle: session.quizTitle,
+    quizLogoUrl: session.quizLogoUrl ?? null,
+    status: session.status as SessionStatus,
+    teamId: me.teamId ?? null,
+    team,
+  };
+}
+
+/**
+ * Rejoin a game this device already has a seat in. Returns null when the
+ * player isn't part of that game (so the normal join flow should run).
+ */
+export async function resumeSession(pin: string): Promise<JoinResult | null> {
+  const uid = await ensurePlayerAuth();
+  const sessionDoc = await findActiveSessionByPin(pin);
+  if (!sessionDoc) return null;
+  return resumeSeat(sessionDoc, uid);
+}
+
+/** Has this player already locked in an answer for the question? (Used when
+ *  reconnecting mid-question.) A missing answer is unreadable under the rules,
+ *  so any error simply means "not answered". */
+export async function hasAnswered(sessionId: string, questionId: string): Promise<boolean> {
+  try {
+    const uid = requireUid();
+    const snap = await getDoc(doc(db, "sessions", sessionId, "answers", `${questionId}_${uid}`));
+    return snap.exists();
+  } catch {
+    return false;
+  }
+}
+
+/** Join a session as an anonymous player (or resume an existing seat). */
+export async function joinSession(
+  pin: string,
+  nickname: string,
+  info?: { phone?: string; state?: string; lga?: string }
+): Promise<JoinResult> {
+  const uid = await ensurePlayerAuth();
+
+  const sessionDoc = await findActiveSessionByPin(pin);
+  if (!sessionDoc) throw new Error("Game not found. Check your PIN and try again.");
+  const session = sessionDoc.data();
+
+  // A returning player keeps their seat: this runs BEFORE the lock, nickname
+  // and cap checks, which would otherwise reject them for being themselves.
+  const resumed = await resumeSeat(sessionDoc, uid);
+  if (resumed) return resumed;
+
   if (session.isRoomLocked) {
     throw new Error("This game is locked and not accepting new players.");
   }

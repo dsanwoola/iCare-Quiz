@@ -2,10 +2,22 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { Button } from "@/react-app/components/ui/button";
 import { Input } from "@/react-app/components/ui/input";
-import { ArrowLeft, Users, Zap, Sparkles, Loader2 } from "lucide-react";
+import { ArrowLeft, Users, Zap, Sparkles, Loader2, RotateCcw } from "lucide-react";
 import { sounds, playSound, initAudio } from "@/react-app/lib/feedback";
-import { getSessionByPin, joinSession } from "@/react-app/lib/data";
+import { getSessionByPin, joinSession, resumeSession } from "@/react-app/lib/data";
+import type { JoinResult } from "@/shared/types";
 import { NIGERIA_STATES, NIGERIA_LGAS } from "@/react-app/data/nigeria";
+
+/** Remembers the last game this device joined, so a player who closed the tab
+ *  (or lost the PIN) gets a one-tap "Rejoin" on the join screen. */
+const LAST_PIN_KEY = "nqa-last-pin";
+function readLastPin(): string | null {
+  try {
+    return localStorage.getItem(LAST_PIN_KEY);
+  } catch {
+    return null;
+  }
+}
 
 export default function JoinGame() {
   const navigate = useNavigate();
@@ -21,6 +33,24 @@ export default function JoinGame() {
   const [phone, setPhone] = useState("");
   const [stateSel, setStateSel] = useState("");
   const [lgaSel, setLgaSel] = useState("");
+  const [rejoin, setRejoin] = useState<{ pin: string; data: JoinResult } | null>(null);
+
+  /** Store the seat for this tab + remember the game on the device, then go in.
+   *  The waiting room forwards straight to the live game if it's already running. */
+  const enterGame = (data: JoinResult, pin: string) => {
+    sessionStorage.setItem("participantId", data.participantId);
+    sessionStorage.setItem("sessionId", data.sessionId);
+    sessionStorage.setItem("nickname", data.nickname);
+    sessionStorage.setItem("quizTitle", data.quizTitle);
+    if (data.quizLogoUrl) sessionStorage.setItem("quizLogoUrl", data.quizLogoUrl);
+    else sessionStorage.removeItem("quizLogoUrl");
+    try {
+      localStorage.setItem(LAST_PIN_KEY, pin);
+    } catch {
+      /* private mode — rejoin-by-PIN still works */
+    }
+    navigate(`/play/${pin}`);
+  };
 
   // Validate PIN from URL on mount
   useEffect(() => {
@@ -33,8 +63,25 @@ export default function JoinGame() {
     }
   }, [urlPin]);
 
+  // No PIN in the URL: if this device was in a game that's still running,
+  // offer a one-tap rejoin instead of making them start over.
+  useEffect(() => {
+    if (urlPin) return;
+    const last = readLastPin();
+    if (!last) return;
+    resumeSession(last)
+      .then((data) => data && setRejoin({ pin: last, data }))
+      .catch(() => {});
+  }, [urlPin]);
+
   const validatePinFromUrl = async (pin: string) => {
     try {
+      // Already have a seat in this game? Go straight back in.
+      const resumed = await resumeSession(pin);
+      if (resumed) {
+        enterGame(resumed, pin);
+        return;
+      }
       const data = await getSessionByPin(pin);
       sessionStorage.setItem("quizTitle", data.quizTitle);
       setCollectInfo(data.collectPlayerInfo);
@@ -61,6 +108,13 @@ export default function JoinGame() {
 
     setIsLoading(true);
     try {
+      // A returning player skips the nickname step and gets their seat back.
+      const resumed = await resumeSession(gamePin);
+      if (resumed) {
+        playSound(sounds.gameStart);
+        enterGame(resumed, gamePin);
+        return;
+      }
       const data = await getSessionByPin(gamePin);
       playSound(sounds.correct);
       sessionStorage.setItem("quizTitle", data.quizTitle);
@@ -123,17 +177,7 @@ export default function JoinGame() {
       );
 
       playSound(sounds.gameStart);
-      sessionStorage.setItem("participantId", data.participantId);
-      sessionStorage.setItem("sessionId", data.sessionId);
-      sessionStorage.setItem("nickname", data.nickname);
-      sessionStorage.setItem("quizTitle", data.quizTitle);
-      if (data.quizLogoUrl) {
-        sessionStorage.setItem("quizLogoUrl", data.quizLogoUrl);
-      } else {
-        sessionStorage.removeItem("quizLogoUrl");
-      }
-
-      navigate(`/play/${gamePin}`);
+      enterGame(data, gamePin);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not join game");
       playSound(sounds.wrong);
@@ -185,6 +229,29 @@ export default function JoinGame() {
                 Enter the PIN shown on screen
               </p>
             </div>
+
+            {/* Got disconnected? One tap back into the game you were playing. */}
+            {rejoin && (
+              <button
+                type="button"
+                onClick={() => {
+                  initAudio();
+                  playSound(sounds.gameStart);
+                  enterGame(rejoin.data, rejoin.pin);
+                }}
+                className="w-full rounded-2xl border-2 border-primary/40 bg-primary/10 px-4 py-3 flex items-center gap-3 text-left active:scale-[0.98] transition-transform"
+              >
+                <div className="gradient-primary w-10 h-10 rounded-xl flex items-center justify-center shrink-0">
+                  <RotateCcw className="w-5 h-5 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <div className="font-bold">Welcome back, {rejoin.data.nickname}!</div>
+                  <div className="text-sm text-muted-foreground truncate">
+                    Tap to rejoin “{rejoin.data.quizTitle}” · PIN {rejoin.pin}
+                  </div>
+                </div>
+              </button>
+            )}
 
             <div className="space-y-4 sm:space-y-5">
               <div className="relative">

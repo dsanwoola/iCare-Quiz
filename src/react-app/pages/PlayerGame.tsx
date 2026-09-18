@@ -17,6 +17,7 @@ import {
   currentQuestionFromSession,
   submitAnswer as submitAnswerApi,
   getMyAnswerResult,
+  hasAnswered,
   ensurePlayerAuth,
   computeTeamStandings,
 } from "@/react-app/lib/data";
@@ -104,7 +105,9 @@ export default function PlayerGame() {
   // Realtime game state via the session document (replaces SSE polling).
   useEffect(() => {
     if (!sessionId || !participantId) {
-      navigate("/join");
+      // No seat in this tab (e.g. reopened in a new tab) — the join page will
+      // recognise this device and put the player straight back in.
+      navigate(gamePin ? `/join/${gamePin}` : "/join", { replace: true });
       return;
     }
     if (!authReady) return;
@@ -141,6 +144,16 @@ export default function PlayerGame() {
         hasPlayedQuestionSound.current = false;
         hasPlayedResultSound.current = false;
         setPhase(cq.questionStatus === "OPEN" ? "QUESTION" : "WAITING");
+        // Reconnected mid-question after already locking in? Don't ask again —
+        // a second submission would be rejected anyway.
+        if (cq.questionStatus === "OPEN" && cq.type !== "BOARD") {
+          const qid = cq.questionId;
+          hasAnswered(sessionId, qid).then((done) => {
+            if (done && lastQuestionId.current === qid) {
+              setPhase((p) => (p === "QUESTION" ? "ANSWERED" : p));
+            }
+          });
+        }
       } else {
         setQuestion(cq);
       }
@@ -324,6 +337,9 @@ export default function PlayerGame() {
       setPhase("ANSWERED");
     } catch (err) {
       console.error("Failed to submit answer", err);
+      // Usually means this answer was already recorded before a reconnect —
+      // show them as locked in rather than leaving them stuck on the question.
+      if (await hasAnswered(sessionId, question.questionId)) setPhase("ANSWERED");
     } finally {
       setIsSubmitting(false);
     }
@@ -331,7 +347,9 @@ export default function PlayerGame() {
 
   useEffect(() => {
     if (!sessionId || !participantId) {
-      navigate("/join");
+      // No seat in this tab (e.g. reopened in a new tab) — the join page will
+      // recognise this device and put the player straight back in.
+      navigate(gamePin ? `/join/${gamePin}` : "/join", { replace: true });
     }
   }, [sessionId, participantId, navigate]);
 
